@@ -1,0 +1,19 @@
+.container {display: flex; } 
+
+.column {flex: 2;}
+
+div.column_blue, .stackgraph_text {font-size: 13px; color: white; background-color: #132361; padding: 10px; flex: 2;}
+
+div.stackgraph_text {flex: 2;}
+
+div.column.stackgraph > div  {width: 60%; margin: auto}
+
+div.column > div {width: 95%; margin: auto; margin-top: 10%; margin-bottom: auto;}
+
+div.column_blue > p > img, div.column > p > img {background: none; border: none; box-shadow: none;}
+
+section.slide.level2 {background-color: white; border: black; border-style: solid;}
+
+section#title-slide {background-color: white; border: black; border-style: solid;}
+
+h2 {text-align: center; }

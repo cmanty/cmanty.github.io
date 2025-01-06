@@ -1,4 +1,4 @@
-.container {display: flex; } 
+.container {display: flex; height: 720px; width: 1280px;} 
 
 .column {flex: 2;}
 
@@ -6,14 +6,15 @@ div.column_blue, .stackgraph_text {font-size: 13px; color: white; background-col
 
 div.stackgraph_text {flex: 2;}
 
-div.column.stackgraph > div  {width: 60%; margin: auto}
+div.column.stackgraph > div  {width: 55%; margin: auto}
 
-div.column > div {width: 95%; margin: auto; margin-top: 10%; margin-bottom: auto;}
+div.column > div {width: 92%; margin: auto; margin-top: 10%; margin-bottom: auto;}
 
-div.column_blue > p > img, div.column > p > img {background: none; border: none; box-shadow: none;}
+div.column_blue > p > img, div.column > p > img {display:block ; background: none; border: none; box-shadow: none; width: 50%; margin: auto; margin-bottom: 20px;}
+
 
 section.slide.level2 {background-color: white; border: black; border-style: solid;}
 
 section#title-slide {background-color: white; border: black; border-style: solid;}
 
-h2 {text-align: center; }
+h2 {display: none; text-align: center; }

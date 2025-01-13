@@ -19,3 +19,5 @@ section.slide.level2 {background-color: white; border: black; border-style: soli
 section#title-slide {background-color: white; border: black; border-style: solid;}
 
 h2 {display: none; text-align: center; }
+
+div.freq-holder {position: absolute; bottom: 0; margin-bottom: 10px}

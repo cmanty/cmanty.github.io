@@ -6,9 +6,9 @@ div.column_blue, .stackgraph_text { font-size: 13px; color: white; background-co
 
 div.stackgraph_text {flex: 2;}
 
-div.column.stackgraph > div  {width: 55%; margin: auto;}
+div.column.stackgraph > div  {width: 50%; margin: auto;}
 
-div.column > div {width: 92%; margin: auto; margin-top: 10%; margin-bottom: auto;}
+div.column > div {width: 92%; margin: auto; margin-bottom: auto;}
 
 div.column_blue > p > img{display:block ; background: none; border: none; box-shadow: none; width: 50%; margin: auto; margin-bottom: 20px;}
 

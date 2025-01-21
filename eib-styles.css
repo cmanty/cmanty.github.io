@@ -1,12 +1,12 @@
-.container {display: flex; height: 720px; width: 1280px;} 
+.container {display: flex; height: 720px; width: 1280px; font-family: Arial;} 
 
 .column {flex: 2;}
 
-div.column_blue, .stackgraph_text {font-size: 13px; color: white; background-color: #132361; padding: 10px; flex: 2;}
+div.column_blue, .stackgraph_text { font-size: 13px; color: white; background-color: #132361; padding: 10px; flex: 2;}
 
 div.stackgraph_text {flex: 2;}
 
-div.column.stackgraph > div  {width: 55%; margin: auto}
+div.column.stackgraph > div  {width: 55%; margin: auto;}
 
 div.column > div {width: 92%; margin: auto; margin-top: 10%; margin-bottom: auto;}
 
@@ -20,4 +20,6 @@ section#title-slide {background-color: white; border: black; border-style: solid
 
 h2 {display: none; text-align: center; }
 
-div.freq-holder {position: absolute; bottom: 0; margin-bottom: 10px}
+div.freq-holder {position: absolute; bottom: 0; margin-bottom: 10px;}
+
+h3.asym-slide-title {text-align: center; font-family: Arial;}

@@ -1,4 +1,4 @@
-.container {display: flex; height: 720px; width: 1280px; font-family: Arial;} 
+.container, .container_topline {display: flex; height: 720px; width: 1280px; font-family: Arial;} 
 
 .column {flex: 2;}
 
@@ -10,9 +10,9 @@ div.column.stackgraph > div  {width: 50%; margin: auto;}
 
 div.column > div {width: 92%; margin: auto; margin-bottom: auto;}
 
-div.column_blue > p > img{display:block ; background: none; border: none; box-shadow: none; width: 50%; margin: auto; margin-bottom: 20px;}
+div.column_blue > p > img {display:block ; background: none; border: none; box-shadow: none; width: 50%; margin: auto; margin-bottom: 20px;}
 
-div.column > p > img  {display: block; background: none; border: none; box-shadow: none; width: 70%; margin-top: 20%; margin-left: auto; margin-right: auto;}
+div.column > p > img {display: block; background: none; border: none; box-shadow: none; width: 70%; margin-top: 20%; margin-left: auto; margin-right: auto;}
 
 section.slide.level2 {background-color: white; border: black; border-style: solid;}
 
@@ -23,3 +23,9 @@ h2 {display: none; text-align: center; }
 div.freq-holder {position: absolute; bottom: 0; margin-bottom: 10px;}
 
 h3.asym-slide-title {text-align: center; font-family: Arial;}
+
+.container_topline >  {display:inline-flex;}
+
+.container_topline > div {flex: 1; align-content: center;}
+
+.container_topline > div > p, .topline_slide_title {text-align: center;}

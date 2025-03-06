@@ -26,6 +26,26 @@ h3.asym-slide-title {text-align: center; font-family: Arial;}
 
 .container_topline >  {display:inline-flex;}
 
-.container_topline > div {flex: 1; align-content: center;}
+.container_topline > div {flex: 1; align-content: top; line-height: 0.5;}
 
-.container_topline > div > p, .topline_slide_title {text-align: center;}
+.container_topline > div > div, .topline_slide_title {text-align: center;}
+
+.container_topline > div > div.top_icon > p {width: 25%; margin: auto; height: 100px;}
+
+div.source {font-size: 0.3em; line-height: 1; color: gray; margin-top: 30px;}
+
+div.main_stat {font-size: 1.5em; font-weight: bold;}
+
+div.main_stat > p, div.sub_stat > p {margin: 0;}
+
+div.sub_stat {font-size: 0.7em; margin-top: 10%;}
+
+.stat_title {display: block; font-weight: bold; padding: 0px; height: 10%; font-size: 0.75em;}
+
+.date_insert, .main_stat2 {font-size: 0.5em;}
+
+.main_stat2 { font-weight: lighter;}
+
+div.main_stat > p > span, div.sub_stat > p > span {display: block;}
+
+h3.topline_slide_title {background-color: rgb(19, 35, 97); color: white;}

@@ -1,0 +1,1825 @@
+---
+title: "Economy in Brief Markdown"
+author: "Christian Manty"
+date: "2024-09-10"
+format: 
+  revealjs:
+    output-file: "index"
+    output-ext: "html"
+    css: "eib-styles.css"
+    center: true
+    width: 1280
+    height: 720
+    margin: 0
+    transition: slide
+    mouse-wheel: true
+    touch: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+library(tidyverse)
+library(blsR)
+library(censusapi)
+library(tidycensus)
+library(janitor)
+library(lubridate)
+library(stringr)
+library(scales)
+library(readxl)
+library(stats)
+library(writexl)
+library(httr)
+library(jsonlite)
+library(sf)
+library(XML)
+library(data.table)
+library(leaflet)
+library(viridis)
+library(ggrepel)
+library(patchwork)
+library(revealjs)
+
+
+censuskey <- "a969851ceba0bb499b6e2c8199790b04c477ebde"
+blskey <- "0e7e8a25a3354dad812a541ce3ba76bb"
+beakey <- "F7B69740-D892-4F7B-9341-6C82FA77A8AD"
+
+# setwd("C:/Users/cmanty/Dallas Regional Chamber/Research & Innovation - Documents/Economy in Brief")
+```
+
+```{r echo=FALSE, cache=TRUE}
+startyear <- 2019
+endyear <- 2024
+
+topline_BLS <- get_n_series_table(
+  c(
+    "LAUMT481910000000003",
+    "LAUMT481910000000004",
+    "LAUMT481910000000005"
+  ),
+  api_key = blskey,
+  start_year = endyear - 1,
+  end_year = endyear
+) %>%
+  select(year, period, "unemp_rate" = "LAUMT481910000000003", "unemp_count" = "LAUMT481910000000004", "emp_count" = "LAUMT481910000000005") %>%
+  mutate(period = str_extract(period, "[1-9]+[0-9]*")) %>%
+  mutate(date = paste(period, year, sep = "-")) %>%
+  mutate(date = my(date, locale = Sys.getlocale("LC_TIME"))) %>%
+  # filter(year == max(as.numeric(year))) %>%
+  # filter(period == max(as.numeric(period)))
+  filter(as.numeric(period) >= max(as.numeric(period[year == max(as.numeric(year))])) - 1)
+
+
+## INFLATION##
+
+
+cpi <- get_series_table(
+  "CUURS37ASA0",
+  api_key = blskey,
+  start_year = endyear - 5,
+  end_year = endyear
+)
+
+cpitables <- get_n_series_table(
+  c(
+    "CUUR0000SA0",
+    "CUUR0000SA0E",
+    "CUUR0000SA0L1E",
+    "CUUR0000SAF1",
+    "CUUR0370SA0",
+    "CUUR0370SA0E",
+    "CUUR0370SA0L1E",
+    "CUUR0370SAF1",
+    "CUURS000SA0",
+    "CUURS000SA0E",
+    "CUURS000SA0L1E",
+    "CUURS000SAF1",
+    "CUURS37ASA0",
+    "CUURS37ASA0E",
+    "CUURS37ASA0L1E",
+    "CUURS37ASAF1"
+  ),
+  apikey = blskey,
+  start_year = endyear - 6,
+  end_year = endyear
+) %>%
+  filter(
+    period != "S01",
+    period != "S02"
+  ) %>%
+  select(year, period, "us.all.items" = CUUR0000SA0, "largecities.all.items" = CUURS000SA0, "west.south.central.all.items" = CUUR0370SA0, "dfw.all.items" = CUURS37ASA0, "us.core" = CUUR0000SA0L1E, "largecities.core" = CUURS000SA0L1E, "west.south.central.core" = CUUR0370SA0L1E, "dfw.core" = CUURS37ASA0L1E, "us.energy" = CUUR0000SA0E, "largecities.energy" = CUURS000SA0E, "west.south.central.energy" = CUUR0370SA0E, "dfw.energy" = CUURS37ASA0E, "us.food" = CUUR0000SAF1, "largecities.food" = CUURS000SAF1, "west.south.central.food" = CUUR0370SAF1, "dfw.food" = CUURS37ASAF1)
+
+
+# All Items:
+### US: CUUR0000SA0
+### Large Cities: CUURS000SA0
+### West South Central: CUUR0370SA0
+### DFW: CUURS37ASA0
+
+# Energy:
+### US: CUUR0000SA0E
+### Large Cities: CUURS000SA0E
+### West South Central: CUUR0370SA0E
+### DFW: CUURS37ASA0E
+
+# Food:
+### US: CUUR0000SAF1
+### Large Cities: CUURS000SAF1
+### West South Central: CUUR0370SAF1
+### DFW: CUURS37ASAF1
+
+# Less Food and Energy (Core):
+### US: CUUR0000SA0L1E
+### Large Cities: CUURS000SA0L1E
+### West South Central: 	CUUR0370SA0L1E
+### DFW: CUURS37ASA0L1E
+
+
+
+
+
+
+
+
+cpitable_rate <- cpitables %>%
+  mutate(period = str_extract(period, "[1-9]+[0-9]*")) %>%
+  mutate(date = paste(period, year, sep = "-")) %>%
+  mutate(date = my(date, locale = Sys.getlocale("LC_TIME"))) %>%
+  mutate(
+    us.all.items.change = 100 * (us.all.items - lag(us.all.items, 12)) / lag(us.all.items, 12),
+    largecities.all.items.change = 100 * (largecities.all.items - lag(largecities.all.items, 12)) / lag(largecities.all.items, 12),
+    wsc.all.items.change = 100 * (west.south.central.all.items - lag(west.south.central.all.items, 12)) / lag(west.south.central.all.items, 12),
+    dfw.all.items.change = 100 * (dfw.all.items - lag(dfw.all.items, 12)) / lag(dfw.all.items, 12),
+    us.core.change = 100 * (us.core - lag(us.core, 12)) / lag(us.core, 12),
+    largecities.core.change = 100 * (largecities.core - lag(largecities.core, 12)) / lag(largecities.core, 12),
+    wsc.core.change = 100 * (west.south.central.core - lag(west.south.central.core, 12)) / lag(west.south.central.core, 12),
+    dfw.core.change = 100 * (dfw.core - lag(dfw.core, 12)) / lag(dfw.core, 12),
+    us.energy.change = 100 * (us.energy - lag(us.energy, 12)) / lag(us.energy, 12),
+    largecities.energy.change = 100 * (largecities.energy - lag(largecities.energy, 12)) / lag(largecities.energy, 12),
+    wsc.energy.change = 100 * (west.south.central.energy - lag(west.south.central.energy, 12)) / lag(west.south.central.energy, 12),
+    dfw.energy.change = 100 * (dfw.energy - lag(dfw.energy, 12)) / lag(dfw.energy, 12),
+    us.food.change = 100 * (us.food - lag(us.food, 12)) / lag(us.food, 12),
+    largecities.food.change = 100 * (largecities.food - lag(largecities.food, 12)) / lag(largecities.food, 12),
+    wsc.food.change = 100 * (west.south.central.food - lag(west.south.central.food, 12)) / lag(west.south.central.food, 12),
+    dfw.food.change = 100 * (dfw.food - lag(dfw.food, 12)) / lag(dfw.food, 12)
+  ) %>%
+  select(year, period, date, us.all.items.change:dfw.food.change) %>%
+  pivot_longer(cols = us.all.items.change:dfw.food.change, names_to = "variable", values_to = "value") # %>%
+# group_by(variable) %>%
+# mutate(basevalue = value[year == endyear-5 & period == "1"]) %>%
+# mutate(rebase_index = value/basevalue) %>%
+# filter(!is.na(value))
+
+
+cpi_rate_dfw <- cpitable_rate %>%
+  filter(variable %in% c("dfw.all.items.change", "dfw.core.change")) %>%
+  filter(!is.na(value))
+
+
+topline_rate <- cpi_rate_dfw %>%
+  filter(date == max(date))
+
+cpi_rates_oneyear <- cpitable_rate %>%
+  filter(!period %in% c("2", "4", "6", "8", "10", "12")) %>%
+  filter(date == max(date)) %>%
+  mutate(
+    category = str_extract(variable, "(?<=\\.).*(?=\\.change)"),
+    region = str_extract(variable, "[^\\.]+")
+  )
+
+#### UNCOMMENT AND USE TO SHOW DYNAMIC TEXT
+
+# topline_indicators_BLS$unemp_count[topline_indicators_BLS$year == endyear] <- 50000
+
+
+
+
+
+
+#   if(topline_indicators_BLS$unemp_rate[topline_indicators_BLS$year == endyear] < topline_indicators_BLS$unemp_rate[topline_indicators_BLS$year == endyear-1]) {
+#     testindicator <- "lower"
+#
+#     testnarrative <- "indicating a year over year improvement in the labor market"
+#
+#   } else {
+#     testindicator <- "higher"
+#
+#     testnarrative <- "indicating a year over year regression in the labor market"
+#
+#   }
+#
+# testhold <- paste0("The unemployement rate in ", endyear," is ", testindicator, " than it was in ", endyear-1," at: ", format(topline_indicators_BLS$unemp_rate[topline_indicators_BLS$year == endyear], scientific = FALSE, big.mark = ","), "%. ", testnarrative)
+```
+
+## Topline Indicators
+
+### TOPLINE INDICATORS {.topline_slide_title}
+
+::::::::::::::::::::: container_topline
+:::::::: topline_1
+::: stat_title
+UNEMPLOYMENT RATE
+:::
+
+::: top_icon
+![](Unemployment%20Rate%20ICON.png)
+:::
+
+::: main_stat
+`r format(topline_BLS$unemp_rate[as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period)) & as.numeric(topline_BLS$year) == max(as.numeric(topline_BLS$year))], scientific = FALSE, big.mark = ",")`%
+
+[`r format(topline_BLS$date[topline_BLS$date == max(topline_BLS$date)], "%b. %Y")`]{.date_insert}
+
+[`r format(topline_BLS$unemp_rate[as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period)) & as.numeric(topline_BLS$year) == max(as.numeric(topline_BLS$year))] - topline_BLS$unemp_rate[as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period)) & as.numeric(topline_BLS$year) == max(as.numeric(topline_BLS$year))-1], scientific = FALSE, big.mark = ",")`]{.main_stat2}
+:::
+
+::: sub_stat
+TX rate is X%
+
+US rate is X%
+:::
+
+::: source
+*Source: Bureau of Labor Statistics, preliminary, not seasonally adjusted*
+:::
+::::::::
+
+:::::::: topline_2
+::: stat_title
+EMPLOYMENT CHANGE
+:::
+
+::: top_icon
+![](Employment%20Change%20ICON.png)
+:::
+
+::: main_stat
+`r format(((topline_BLS$emp_count[as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period)) & topline_BLS$year == max(topline_BLS$year)] - topline_BLS$emp_count[as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period)) & topline_BLS$year == max(topline_BLS$year)-1])/topline_BLS$emp_count[as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period)) & topline_BLS$year == max(topline_BLS$year)-1])*100, scientifc = FALSE, big.mark = ",", digits = 3)`%
+
+[`r format(topline_BLS$date[topline_BLS$date == max(topline_BLS$date)], "%b. %Y")`]{.date_insert}
+
+[`r format(topline_BLS$emp_count[topline_BLS$year == max(topline_BLS$year) & as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period))] - topline_BLS$emp_count[topline_BLS$year == max(topline_BLS$year)-1 & as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period))], scientific = FALSE, big.mark = ",", digits = 3)`]{.main_stat2}
+:::
+
+::: sub_stat
+Total employment is X% greater than pre-pandemic levels
+:::
+
+::: source
+*Source: Bureau of Labor Statistics, preliminary, not seasonally adjusted*
+:::
+::::::::
+
+:::::::: topline_3
+::: stat_title
+CONSUMER PRICE INDEX
+:::
+
+::: top_icon
+![](Consumer%20Price%20Index%20ICON.png)
+:::
+
+::: main_stat
+`r format(topline_rate$value[topline_rate$variable == "dfw.all.items.change"], scientific = FALSE, big.mark = ",", digits = 3)`%
+
+[`r unique(format(topline_rate$date[topline_rate$date == max(topline_rate$date)], "%b. %Y"))`]{.date_insert}
+
+[Core inflation rate is `r format(topline_rate$value[topline_rate$variable == "dfw.core.change"], scientific = FALSE, big.mark = ",", digits = 3)`%]{.main_stat2}
+:::
+
+::: sub_stat
+US rates are X% and X% respectively
+:::
+
+::: source
+*Source: Bureau of Labor Statistics, preliminary, not seasonally adjusted*
+:::
+::::::::
+:::::::::::::::::::::
+
+::::: logofooter_box
+::: footnote_topline
+\*Bi-monthly data for DFW. Core Inflation excludes food and and energy
+:::
+
+::: logoflexbox
+![](DRC_COY%20full-color%20logo-CMYK.jpg)
+:::
+:::::
+
+## Key Takeaways
+
+### KEY TAKEAWAYS {.topline_slide_title}
+
+::: keytakeaways
+-   The Dallas Region has the highest rate of year-over-year job growth at 3.2% and the highest total job growth (134.2K) among the largest U.S. metros in Dec. 2023.
+
+-   The Dallas Region’s five-year jobs gain (593.7K) through Dec. 2023 is more than the combined gains of metros with the next highest employment growth, Atlanta (273.0K) and Houston (258.5K).
+
+-   The Dallas Region’s unemployment rate was 3.3% in Dec. 2023. This rate is unchanged from Nov. 2023. The region has rebounded from a high of 12.1% in April 2020.
+
+-   The 24 Fortune 500 companies headquartered in the Dallas Region generated \$1.35T in 2022 revenues, the second highest amount behind New York.
+:::
+
+::::: logofooter_box
+::: footnote_topline
+\*Bi-monthly data for DFW. Core Inflation excludes food and and energy
+:::
+
+::: logoflexbox
+![](DRC_COY%20full-color%20logo-CMYK.jpg)
+:::
+:::::
+
+```{r echo=FALSE, cache=TRUE}
+endyear <- 2024
+
+# count is in thousands of employees
+
+emp_by_metro <- get_n_series_table(
+  c(
+    "SMU04380600000000001",
+    "SMU06310800000000001",
+    "SMU06418600000000001",
+    "SMU11479000000000001",
+    "SMU12331000000000001",
+    "SMU13120600000000001",
+    "SMU17169800000000001",
+    "SMU25144600000000001",
+    "SMU36356200000000001",
+    "SMU42379800000000001",
+    "SMU48191000000000001",
+    "SMU48264200000000001"
+  ),
+  api_key = blskey,
+  start_year = endyear - 5,
+  end_year = endyear
+) %>%
+  select(year, period, "Phoenix" = "SMU04380600000000001", "Los Angeles" = "SMU06310800000000001", "San Francisco" = "SMU06418600000000001", "Washington DC" = "SMU11479000000000001", "Miami" = "SMU12331000000000001", "Atlanta" = "SMU13120600000000001", "Chicago" = "SMU17169800000000001", "Boston" = "SMU25144600000000001", "NYC" = "SMU36356200000000001", "Philadelphia" = "SMU42379800000000001", "Dallas" = "SMU48191000000000001", "Houston" = "SMU48264200000000001") %>%
+  mutate(period = str_extract(period, "[1-9]+[0-9]*"))
+
+
+######### YEAR OVER YEAR ##########
+
+emp_metro_yoy <- emp_by_metro %>%
+  # filter(year == max(as.numeric(year))) %>%
+  filter(period == max(as.numeric(period[year == max(as.numeric(year))]))) %>%
+  pivot_longer(names_to = "Metro", cols = Phoenix:Houston, values_to = "employment") %>%
+  pivot_wider(names_from = year, values_from = employment, names_prefix = "emp") %>%
+  mutate(empchange_ct = get(paste0("emp", endyear)) - get(paste0("emp", endyear - 1))) %>%
+  mutate(empchange_pct = 100 * (empchange_ct / get(paste0("emp", endyear - 1)))) %>%
+  pivot_longer(names_to = "variable", values_to = "value", cols = empchange_ct:empchange_pct)
+
+
+emp_by_metro2 <- emp_metro_yoy %>%
+  mutate(value = ifelse(variable == "empchange_pct", value * 30, value)) %>%
+  mutate(label = ifelse(variable == "empchange_pct", (value / 30), value)) %>%
+  mutate(sortvalue = ifelse(variable == "empchange_pct", value * 100, 0))
+
+# FOR BAR OVERLAY VARIANT
+emp_by_metro3 <- emp_metro_yoy %>%
+  mutate(value = ifelse(variable == "empchange_pct", value * 30, value)) %>%
+  mutate(label = ifelse(variable == "empchange_pct", (value / 30), value)) %>%
+  pivot_wider(names_from = variable, values_from = value)
+
+emp_metro_graph <- ggplot(emp_metro_yoy, aes(reorder(Metro, value), y = value, fill = variable)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  scale_fill_viridis(discrete = TRUE, option = "A") +
+  coord_flip()
+# scale_y_continuous(sec.axis = sec_axis(name = "Percent Change"))
+
+
+# Either 2 graphs or just one graph with % change by metro area
+
+emp_metro_graph2 <- ggplot(emp_by_metro2, aes(reorder(Metro, -value), y = value, fill = variable)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  scale_fill_viridis(discrete = TRUE, option = "A", labels = c("Count", "Percent Change")) +
+  scale_y_continuous(limits = c(0, 175), breaks = seq(0, 175, by = 25), sec.axis = sec_axis(~ . / 30, name = "Percent")) +
+  theme(
+    axis.text.x = element_text(angle = 45),
+    plot.title = element_text(hjust = 0.5, size = 12),
+    plot.subtitle = element_text(hjust = 0.5, size = 9),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "black"),
+    # panel.grid.minor.y = element_line(color = "black"),
+    panel.border = element_rect(color = "black", fill = NA),
+    axis.text.x.bottom = element_text(vjust = 0.6)
+  ) +
+  labs(title = "Metro Employment", subtitle = "YoY Percent Change and Net Change (Thousands) in employment, <Insert Date>", y = "Change in Employment (Thousands)", x = "Industry", fill = "Metric") +
+  geom_text(aes(label = format(label, digits = 1, scientific = FALSE)), size = 2, position = position_dodge(width = 0.9), vjust = -1, hjust = 0.5)
+
+
+
+####### BAR OVERLAY VARIANT #####################
+
+### NO LEGEND###
+
+# emp_metro_graph3 <- ggplot(emp_by_metro3, aes(reorder(Metro, -empchange_ct))) +
+#   geom_bar(aes(y=empchange_ct), position = "identity", stat= "identity", fill = "blue", alpha = 0.3) +
+#   geom_bar(aes(y=empchange_pct), position = "identity", stat= "identity", fill = "green", alpha = 0.7, width = 0.9) +
+#   scale_y_continuous(limits = c(0, 175), breaks = seq(0, 175, by = 25), sec.axis = sec_axis(~ . / 30, name = "Percent")) +
+#   theme(axis.text.x = element_text(angle = 45),
+#         plot.title = element_text(hjust = 0.5, size = 12),
+#         plot.subtitle = element_text(hjust = 0.5, size = 9),
+#         panel.background = element_blank(),
+#         panel.grid.major.x = element_blank(),
+#         panel.grid.major.y = element_line(color = "black"),
+#         #panel.grid.minor.y = element_line(color = "black"),
+#         panel.border = element_rect(color = "black", fill = NA),
+#         axis.text.x.bottom = element_text(vjust=0.6)) +
+#   labs(title = "Metro Employment", subtitle = "YoY Percent Change and Net Change (Thousands) in employment, <Insert Date>", y = "Change in Employment (Thousands)", x = "Industry") +
+#   geom_text_repel(aes(y = empchange_ct, label = format(label, digits = 1, scientific = FALSE)), size = 2, position = position_dodge(width = 0.9), vjust = -1, hjust = 0.5) +
+#   geom_text_repel(aes(y = empchange_pct, label = format(label, digits = 1, scientific = FALSE)), size = 2, position = position_dodge(width = 0.9), vjust = -1, hjust = 0.5)
+
+### WITH LEGEND###
+
+emp_metro_graph3 <- ggplot(emp_by_metro2, aes(reorder(Metro, -sortvalue), y = value, fill = variable, alpha = variable)) +
+  geom_bar(stat = "identity", color = "black", width = c(0.8, 0.5)) +
+  scale_fill_manual(values = c("#132361", "#D03137"), labels = c("Count", "Percent Change")) +
+  scale_alpha_manual(values = c(0.6, 0.7), guide = "none") +
+  scale_y_continuous(limits = c(-20, 150), breaks = seq(0, 150, by = 25), sec.axis = sec_axis(~ . / 30, name = "Percent")) +
+  theme(
+    axis.text.x = element_text(angle = 45),
+    plot.title = element_text(hjust = 0.5, size = 12),
+    plot.subtitle = element_text(hjust = 0.5, size = 9),
+    plot.caption = element_text(face = "italic", color = "#676767", hjust = -0.1),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "black"),
+    # panel.grid.minor.y = element_line(color = "black"),
+    panel.border = element_rect(color = "black", fill = NA),
+    axis.text.x.bottom = element_text(vjust = 0.6),
+    legend.position = "bottom",
+    legend.title = element_blank()
+  ) +
+  labs(
+    subtitle = "YoY Percent Change and Net Change (Thousands) in employment, <Insert Date>",
+    y = "Change in Employment (Thousands)",
+    x = "Industry",
+    fill = "Metric",
+    caption = "Source: BLS. Slide last updated <INSERT DATE>"
+  ) +
+  geom_text_repel(
+    aes(
+      label =
+        paste0(
+          format(label, digits = 1, scientific = FALSE),
+          ifelse(variable == "empchange_pct",
+            "%",
+            ""
+          )
+        )
+    ),
+    size = 2,
+    vjust = -1,
+    hjust = 0.5,
+    alpha = 1,
+    nudge_y = 1.75,
+    direction = "y"
+  )
+
+
+########## FIVE YEAR ##########
+
+emp_metro_five <- emp_by_metro %>%
+  filter(period == max(as.numeric(period[year == max(as.numeric(year))]))) %>%
+  pivot_longer(names_to = "Metro", cols = Phoenix:Houston, values_to = "employment") %>%
+  pivot_wider(names_from = year, values_from = employment, names_prefix = "emp") %>%
+  mutate(empchange_ct = get(paste0("emp", endyear)) - get(paste0("emp", endyear - 5))) %>%
+  mutate(empchange_pct = 100 * (empchange_ct / get(paste0("emp", endyear - 5)))) %>%
+  pivot_longer(names_to = "variable", values_to = "value", cols = empchange_ct:empchange_pct) %>%
+  filter(variable == "empchange_ct")
+
+
+
+emp_metro_graph_fiveyear <- ggplot(emp_metro_five, aes(reorder(Metro, -value), y = value, fill = Metro)) +
+  geom_bar(position = "dodge", stat = "identity", color = "black", width = 0.6) +
+  scale_fill_manual(values = c("Dallas" = "#132361", "Houston" = "#C7C8CA", "Phoenix" = "#C7C8CA", "Miami" = "#C7C8CA", "Atlanta" = "#C7C8CA", "NYC" = "#C7C8CA", "Philadelphia" = "#C7C8CA", "Washington DC" = "#C7C8CA", "Los Angeles" = "#C7C8CA", "Chicago" = "#C7C8CA", "Boston" = "#C7C8CA", "San Francisco" = "#C7C8CA"), labels = "Count") +
+  scale_y_continuous(limits = c(-50, 600), breaks = seq(0, 600, by = 100)) +
+  theme(
+    axis.text.x = element_text(angle = 45, size = 12),
+    axis.text.y = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5, size = 13),
+    plot.subtitle = element_text(hjust = 0.5, size = 6),
+    plot.caption = element_text(face = "italic", color = "#676767", hjust = -0.1),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "black"),
+    # panel.grid.minor.y = element_line(color = "black"),
+    panel.border = element_rect(color = "black", fill = NA),
+    axis.text.x.bottom = element_text(vjust = 0.6),
+    axis.title = element_blank(),
+    legend.position = "none",
+    legend.title = element_blank()
+  ) +
+  labs(title = "5-Year Net Change in Employment (Thousands) <Insert Date Range>") +
+  geom_text(aes(label = format(value, digits = 2, nsmall = 1), vjust = ifelse(value > 0, -1, 2)), size = 3.5, position = position_dodge(width = 0.8), hjust = 0.5)
+
+
+########## COVID-TO-NOW ###########
+
+emp_metro_covid <- emp_by_metro %>%
+  mutate(date = paste(period, year, sep = "-")) %>%
+  mutate(date = my(date, locale = Sys.getlocale("LC_TIME"))) %>%
+  filter(date %in% c("2019-12-01", paste0(endyear, "-", ifelse(max(as.numeric(period[year == endyear])) > 9, max(as.numeric(period[year == endyear])), paste0("0", max(as.numeric(period[year == endyear])))), "-", "01"))) %>%
+  select(-c(period, date)) %>%
+  pivot_longer(names_to = "Metro", cols = Phoenix:Houston, values_to = "employment") %>%
+  pivot_wider(names_from = year, values_from = employment, names_prefix = "emp") %>%
+  mutate(empchange_ct = get(paste0("emp", endyear)) - emp2019) %>%
+  mutate(empchange_pct = 100 * (empchange_ct / emp2019)) %>%
+  pivot_longer(names_to = "variable", values_to = "value", cols = empchange_ct:empchange_pct) %>%
+  filter(variable == "empchange_pct")
+
+
+emp_metro_graph_covid <- ggplot(emp_metro_covid, aes(reorder(Metro, -value), y = value, fill = Metro)) +
+  geom_bar(position = "dodge", stat = "identity", color = "black", width = 0.6) +
+  scale_fill_manual(values = c("Dallas" = "#132361", "Houston" = "#C7C8CA", "Phoenix" = "#C7C8CA", "Miami" = "#C7C8CA", "Atlanta" = "#C7C8CA", "NYC" = "#C7C8CA", "Philadelphia" = "#C7C8CA", "Washington DC" = "#C7C8CA", "Los Angeles" = "#C7C8CA", "Chicago" = "#C7C8CA", "Boston" = "#C7C8CA", "San Francisco" = "#C7C8CA"), labels = "Count") +
+  scale_y_continuous(limits = c(-4, 14), breaks = seq(-4, 14, by = 2)) +
+  theme(
+    axis.text.x = element_text(angle = 45, size = 12),
+    axis.text.y = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5, size = 13),
+    plot.subtitle = element_text(hjust = 0.5, size = 9),
+    plot.caption = element_text(face = "italic", color = "#676767", hjust = -0.1),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "black"),
+    # panel.grid.minor.y = element_line(color = "black"),
+    panel.border = element_rect(color = "black", fill = NA),
+    axis.text.x.bottom = element_text(vjust = 0.6),
+    axis.title = element_blank(),
+    legend.position = "none",
+    legend.title = element_blank()
+  ) +
+  labs(title = "Percent Change since Pre-Pandemic Peak <Insert Date Range>", caption = "Source: BLS. Slide last updated <INSERT DATE>") +
+  geom_text(aes(label = format(value, digits = 1, nsmall = 1), vjust = ifelse(value > 0, -1, 2)), size = 3.5, position = position_dodge(width = 0.8), hjust = 0.5)
+
+
+# Scaling percent variable to axis ratio in the respective GGPLOT aesthetics
+
+
+# emp_metro_graph
+#
+#
+# emp_metro_graph2s
+```
+
+## Employment by Metro
+
+::::: container
+::: column
+### EMPLOYMENT BY METRO AREA {.asym-slide-title}
+
+```{r emp_metro1, fig.asp=0.75, fig.width = 8, fig.align= 'left', dpi=300}
+par(mar = c(5, 5, 0.1, 0.1))
+plot(emp_metro_graph3)
+
+```
+:::
+
+::: column_blue
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Year-over-year (YOY) percent and net change in employment for the 12 most populous U.S. metropolitan areas. DRC IS AWESOME!
+
+**Why it's important:** YOY net change in employment can indicate whether an economy is improving or declining, while accounting for the effects of seasonal variability in monthly data. YOY percent change in employment normalizes the size of the employment base across target geographies, allowing for an alternative comparison of performance.
+
+**Key Takeaways:**
+
+-   The `r emp_metro_yoy$Metro[emp_metro_yoy$value == max(emp_metro_yoy$value)]` metro added the most jobs (`r format(1000*emp_metro_yoy$value[emp_metro_yoy$value == max(emp_metro_yoy$value)], scientific = FALSE, big.mark = ",")`) and `r emp_metro_yoy$Metro[emp_metro_yoy$value == max(emp_metro_yoy$value[emp_metro_yoy$variable == "empchange_pct"])]` had the highest rate of employment growth (`r format(emp_metro_yoy$value[emp_metro_yoy$value == max(emp_metro_yoy$value[emp_metro_yoy$variable == "empchange_pct"])], scientific = FALSE, big.mark = ",", digits = 3)`%) among the largest U.S. metros in Dec. 2023.
+-   All large metro areas have shown YOY employment gains for the 33rd month in a row. Larger-than-normal YOY gains began appearing in April 2021 due to steep job losses in 2020 but have continued to scale back to normal through the end of 2023.
+-   The top 12 metros accounted for 32% of the 2.9 million jobs added to the U.S. economy in Dec. 2023.
+-   The Dallas Region’s pre-pandemic and pandemic job performance is hidden in these employment rebound comparison figures requiring more exploration that follows.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::
+
+## Employment by Metro 2
+
+::::: container
+::: {.column .stackgraph}
+### EMPLOYMENT BY METRO AREA {.asym-slide-title}
+
+```{r emp_metro2, fig.asp=1.5, fig.width = 8, dpi=300, class.output = "r-stretch"}
+par(mar = c(5, 5, 0.1, 0.1))
+
+printout <- emp_metro_graph_fiveyear / emp_metro_graph_covid
+
+
+printout
+## DON"T FORGET TO MENTION THAT THIS VISUALIZATION IS VERY CONFUSING TO HAVE NON-CONVENTIALLY SCALED DUAL AXES
+```
+:::
+
+::: {.column_blue .stackgraph_text}
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Five years of net change in employment for the 12 most populous U.S. metropolitan areas covering pre-pandemic, pandemic, and recovery periods, and percent of pre-pandemic jobs added to date.
+
+**Why it's important:** Five years of net change in employment data highlights the economic strength metros exhibited heading into the pandemic, as well as their ability to recover after pandemic job losses. Percent of jobs beyond the pre-pandemic peak indicates how fast a metro has moved beyond recovery.
+
+**Key Takeaways:**
+
+-   The Dallas Region is first among large metros in net job gains over the past five years with a total of 593,700, more jobs than the next two large metros – Atlanta and Houston – combined.
+
+-   The Dallas Region surpassed its pre-pandemic total jobs high mark from Feb. 2020 sooner than all other large metros. Several large metros continue to hover around pre-pandemic job levels.
+
+-   In Dec. 2023, total employment in the Dallas Region was 4.4 million. Dallas currently has 13.6% more jobs than at peak pre-pandemic employment, 5.2 percentage points higher than the next large metro.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::
+
+## Employment by Industry
+
+::::: container
+::: column
+### EMPLOYMENT BY INDUSTRY {.asym-slide-title}
+
+```{r echo=FALSE, cache=TRUE}
+emp_by_ind_dfw <- get_n_series_table(
+  c(
+    "SMU48191001500000001",
+    "SMU48191003000000001",
+    "SMU48191004000000001",
+    "SMU48191004200000001",
+    "SMU48191005000000001",
+    "SMU48191005500000001",
+    "SMU48191006000000001",
+    "SMU48191006500000001",
+    "SMU48191007000000001",
+    "SMU48191008000000001",
+    "SMU48191009000000001"
+  ),
+  api_key = blskey,
+  start_year = endyear - 5,
+  end_year = endyear
+) %>%
+  select(year, period, "Min., Log., & Con." = "SMU48191001500000001", "Manuf." = "SMU48191003000000001", "Trade, Trans., & Util." = "SMU48191004000000001", "Information" = "SMU48191005000000001", "Fin. Activities" = "SMU48191005500000001", "Prof. & Bus. Services" = "SMU48191006000000001", "Edu. & Health Services" = "SMU48191006500000001", "Leisure & Hospitality" = "SMU48191007000000001", "Other Services" = "SMU48191008000000001", "Government" = "SMU48191009000000001") %>%
+  mutate(period = str_extract(period, "[1-9]+[0-9]*"))
+
+
+emp_ind_dfw_yoy <- emp_by_ind_dfw %>%
+  filter(period == max(as.numeric(period[year == max(as.numeric(year))]))) %>%
+  pivot_longer(cols = 3:12, names_to = "Industry", values_to = "Employment") %>%
+  select(year, Industry, Employment) %>%
+  pivot_wider(names_from = year, values_from = Employment, names_prefix = "emp") %>%
+  mutate(empchange_ct = get(paste0("emp", endyear)) - get(paste0("emp", endyear - 1))) %>%
+  mutate(empchange_pct = 100 * (empchange_ct / get(paste0("emp", endyear - 1)))) %>%
+  pivot_longer(names_to = "variable", values_to = "value", cols = empchange_ct:empchange_pct) %>%
+  mutate(geography = "DFW")
+
+
+
+
+
+
+emp_by_ind_us <- get_n_series_table(
+  c(
+    "CEU1000000001",
+    "CEU2000000001",
+    "CEU3000000001",
+    "CEU4000000001",
+    "CEU5000000001",
+    "CEU5500000001",
+    "CEU6000000001",
+    "CEU6500000001",
+    "CEU7000000001",
+    "CEU8000000001",
+    "CEU9000000001"
+  ),
+  api_key = blskey,
+  start_year = endyear - 5,
+  end_year = endyear
+) %>%
+  select(year, period, "Min., Log." = "CEU1000000001", "Cons." = "CEU2000000001", "Manuf." = "CEU3000000001", "Trade, Trans., & Util." = "CEU4000000001", "Information" = "CEU5000000001", "Fin. Activities" = "CEU5500000001", "Prof. & Bus. Services" = "CEU6000000001", "Edu. & Health Services" = "CEU6500000001", "Leisure & Hospitality" = "CEU7000000001", "Other Services" = "CEU8000000001", "Government" = "CEU9000000001") %>%
+  mutate(period = str_extract(period, "[1-9]+[0-9]*"))
+
+
+
+
+emp_ind_us_yoy <- emp_by_ind_us %>%
+  filter(period == max(as.numeric(period[year == max(as.numeric(year))]))) %>%
+  mutate(`Min., Log., & Con.` = `Min., Log.` + `Cons.`) %>%
+  select(-`Min., Log.`, -`Cons.`) %>%
+  pivot_longer(cols = 3:12, names_to = "Industry", values_to = "Employment") %>%
+  select(year, Industry, Employment) %>%
+  pivot_wider(names_from = year, values_from = Employment, names_prefix = "emp") %>%
+  mutate(empchange_ct = get(paste0("emp", endyear)) - get(paste0("emp", endyear - 1))) %>%
+  mutate(empchange_pct = 100 * (empchange_ct / get(paste0("emp", endyear - 1)))) %>%
+  pivot_longer(names_to = "variable", values_to = "value", cols = empchange_ct:empchange_pct) %>%
+  mutate(geography = "US")
+
+
+
+
+
+
+
+emp_ind_compare_yoy <- emp_ind_dfw_yoy %>%
+  rbind(emp_ind_us_yoy) %>%
+  filter(variable == "empchange_pct") %>%
+  mutate(sortvalue = ifelse(variable == "empchange_pct" & geography == "DFW", value * 100, 0))
+
+
+
+
+
+emp_industry_graph_yoy <- ggplot(emp_ind_compare_yoy, aes(reorder(Industry, -sortvalue), y = value, fill = geography)) +
+  geom_bar(position = "dodge", stat = "identity", width = 0.7, color = "black") +
+  scale_fill_manual(values = c("DFW" = "#132361", "US" = "#C7C8CA")) +
+  scale_y_continuous(limits = c(-1, 5.5), breaks = seq(0, 5, by = 1)) +
+  theme(
+    axis.text.x = element_text(angle = 45, size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.x = element_blank(),
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5, size = 9),
+    plot.caption = element_text(face = "italic", color = "#676767", hjust = -0.05),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "black"),
+    panel.border = element_rect(color = "black", fill = NA),
+    axis.text.x.bottom = element_text(vjust = 0.5),
+    # axis.title = element_blank(),
+    legend.position = "bottom",
+    plot.margin = margin(5, 30, 5, 5), "cm",
+    legend.title = element_blank()
+  ) +
+  labs(subtitle = paste0("YoY Percent Change in Employment by Industry Sector,", " <Insert Date>"), y = "Percent Change in Employment", x = "Industry", fill = "Metric", caption = "Source: BLS. Slide last updated <INSERT DATE>") +
+  geom_text(aes(label = format(value, digits = 1), vjust = ifelse(value > 0, -1, 2)), size = 3, position = position_dodge(width = 0.8), hjust = 0.5)
+
+
+
+
+
+
+
+############## US SERIES ##########
+
+# ALL EMPLOYEES, THOUSANDS Mining and logging Mining and logging Not Seasonally Adjusted : CEU1000000001
+#
+# ALL EMPLOYEES, THOUSANDS Construction Construction Not Seasonally Adjusted : CEU2000000001
+#
+# ALL EMPLOYEES, THOUSANDS Manufacturing Manufacturing Not Seasonally Adjusted : CEU3000000001
+#
+# ALL EMPLOYEES, THOUSANDS Trade, transportation, and utilities Trade, transportation, and utilities Not Seasonally Adjusted : CEU4000000001
+#
+# ALL EMPLOYEES, THOUSANDS Information Information Not Seasonally Adjusted : CEU5000000001
+#
+# ALL EMPLOYEES, THOUSANDS Financial activities Financial activities Not Seasonally Adjusted : CEU5500000001
+#
+# ALL EMPLOYEES, THOUSANDS Professional and business services Professional and business services Not Seasonally Adjusted : CEU6000000001
+#
+# ALL EMPLOYEES, THOUSANDS Private education and health services Private education and health services Not Seasonally Adjusted : CEU6500000001
+#
+# ALL EMPLOYEES, THOUSANDS Leisure and hospitality Leisure and hospitality Not Seasonally Adjusted : CEU7000000001
+#
+# ALL EMPLOYEES, THOUSANDS Other services Other services Not Seasonally Adjusted : CEU8000000001
+#
+# ALL EMPLOYEES, THOUSANDS Government Government Not Seasonally Adjusted : CEU9000000001
+#
+
+
+# SMU48000000000000001
+# SMU48124200000000001
+# SMU48191000000000001
+# SMU48264200000000001
+# SMU48417000000000001
+```
+
+```{r emp_industry, fig.width = 8, fig.asp=0.8, dpi=300}
+par(mar = c(5, 5, 0.1, 0.1))
+
+plot(emp_industry_graph_yoy)
+```
+:::
+
+::: column_blue
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Year-over-year (YOY) percent change in employment in the Dallas Region by industry sector compared with the U.S. 
+
+**Why it's important:** Industries were impacted by the pandemic to varying degrees. This is reflected in the magnitude of job losses, recovery, and growth in the Dallas Region by sector compared with national figures.
+
+**Key Takeaways:**
+
+-   All Dallas Region industries are showing YOY growth in Dec. 2023. This represents more than two full years of growth across all industries.
+
+-   Other services and mining, logging & construction led among DFW industries in YOY percent growth for Dec. 2023, though professional & business services gained the most jobs over the past year.
+
+-   Most DFW industries are growing faster than the national average excepting education & health services and government.
+
+-   The Dallas Region’s pre-pandemic industrial diversity has helped to reduce the length of recovery as compared to metro areas that are dependent on only a few industries.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::
+
+## Employment by Industry 2
+
+::::: container
+::: {.column .stackgraph}
+### EMPLOYMENT BY INDUSTRY {.asym-slide-title}
+
+```{r echo=FALSE, cache=TRUE}
+emp_ind_dfw_fiveyear <- emp_by_ind_dfw %>%
+  filter(period == max(as.numeric(period[year == max(as.numeric(year))]))) %>%
+  pivot_longer(cols = 3:12, names_to = "Industry", values_to = "Employment") %>%
+  select(year, Industry, Employment) %>%
+  pivot_wider(names_from = year, values_from = Employment, names_prefix = "emp") %>%
+  mutate(empchange_ct = get(paste0("emp", endyear)) - get(paste0("emp", endyear - 5))) %>%
+  mutate(empchange_pct = 100 * (empchange_ct / get(paste0("emp", endyear - 5)))) %>%
+  pivot_longer(names_to = "variable", values_to = "value", cols = empchange_ct:empchange_pct) %>%
+  filter(variable == "empchange_ct")
+
+
+
+
+
+
+######## VVVVVVVVVVVVV STILL NEED TO CHANGE FOR INDUSTRY (NEEDS CHECK) VVVVVVVVVVVVVV ###########
+emp_ind_dfw_covid <- emp_by_ind_dfw %>%
+  mutate(date = paste(period, year, sep = "-")) %>%
+  mutate(date = my(date, locale = Sys.getlocale("LC_TIME"))) %>%
+  filter(date %in% c("2019-12-01", paste0(endyear, "-", ifelse(max(as.numeric(period[year == endyear])) > 9, max(as.numeric(period[year == endyear])), paste0("0", max(as.numeric(period[year == endyear])))), "-", "01"))) %>%
+  select(-c(period, date)) %>%
+  pivot_longer(names_to = "Industry", cols = `Min., Log., & Con.`:Government, values_to = "employment") %>%
+  pivot_wider(names_from = year, values_from = employment, names_prefix = "emp") %>%
+  mutate(empchange_ct = get(paste0("emp", endyear)) - emp2019) %>%
+  mutate(empchange_pct = 100 * (empchange_ct / emp2019)) %>%
+  pivot_longer(names_to = "variable", values_to = "value", cols = empchange_ct:empchange_pct) %>%
+  filter(variable == "empchange_pct")
+
+######## ^^^^^^^^^^^^ STILL NEED TO CHANGE FOR INDUSTRY (NEEDS CHECK) ^^^^^^^^^^ ###########
+
+
+
+
+
+# emp_industry_graph_fiveyear <- ggplot(emp_ind_compare_yoy, aes(reorder(Industry, -value), y=value, fill = geography)) +
+#     geom_bar( position = "dodge", stat= "identity") +
+#     scale_fill_viridis(discrete = TRUE, option = "D") +
+#     theme(axis.text.x = element_text(angle = 45),
+#          plot.title = element_text(hjust = 0.5),
+#          plot.subtitle = element_text(hjust = 0.5, size = 6),
+#          plot.caption = element_text(face = "italic", color = "#676767", hjust = -0.1),
+#          panel.background = element_blank(),
+#          panel.grid.major.x = element_blank(),
+#          panel.grid.major.y = element_line(color = "black"),
+#          panel.border = element_rect(color = "black", fill = NA),
+#          axis.text.x.bottom = element_text(vjust=0.5),
+#          axis.title = element_blank()) +
+#     labs(title = "Industry Employment", y = "Change in Employment (Thousands)", x = "Industry", fill = "Metric")
+#
+
+
+
+
+###### STACKGRAPH FORMAT #######
+
+
+emp_industry_graph_fiveyear <- ggplot(emp_ind_dfw_fiveyear, aes(reorder(Industry, -value), y = value, fill = Industry)) +
+  geom_bar(position = "dodge", stat = "identity", fill = "#00A6E9", width = 0.6) +
+  scale_y_continuous(limits = c(0, 160), breaks = seq(0, 150, by = 25)) +
+  theme(
+    axis.text.x = element_text(angle = 45, size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.x = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 13),
+    plot.subtitle = element_text(hjust = 0.5, size = 6),
+    plot.caption = element_text(face = "italic", color = "#676767", hjust = -0.1),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "black"),
+    panel.border = element_rect(color = "black", fill = NA),
+    axis.text.x.bottom = element_text(vjust = 0.6),
+    # axis.title = element_blank(),
+    legend.position = "none"
+  ) +
+  labs(title = "5-Year Net Change in Employment (Thousands), <Insert Date>", y = "Change in Employment (Thousands)") +
+  geom_text(aes(label = format(value, digits = 2)), size = 3.5, position = position_dodge(width = 0.8), vjust = -1, hjust = 0.5)
+
+
+emp_industry_graph_covid <- ggplot(emp_ind_dfw_covid, aes(reorder(Industry, -value), y = value, fill = Industry)) +
+  geom_bar(position = "dodge", stat = "identity", fill = "#00A6E9", width = 0.6) +
+  scale_y_continuous(limits = c(0, 22.5), breaks = seq(0, 20, by = 5)) +
+  theme(
+    axis.text.x = element_text(angle = 45, size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title.x = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 13),
+    plot.subtitle = element_text(hjust = 0.5, size = 6),
+    plot.caption = element_text(face = "italic", color = "#676767", hjust = -0.1),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "black"),
+    panel.border = element_rect(color = "black", fill = NA),
+    axis.text.x.bottom = element_text(vjust = 0.6),
+    # axis.title = element_blank(),
+    legend.position = "none"
+  ) +
+  labs(title = "Percent Change since Pre-Pandemic Peak, <Insert Date>", y = "Percent Change in Employment", caption = "Source: BLS. Slide last updated <INSERT DATE>") +
+  geom_text(aes(label = format(value, digits = 2)), size = 3.5, position = position_dodge(width = 0.8), vjust = -1, hjust = 0.5)
+```
+
+```{r emp_industry_stack, fig.width = 8, fig.asp=1.5, dpi=300}
+par(mar = c(5, 5, 0.1, 0.1))
+
+printout <- emp_industry_graph_fiveyear / emp_industry_graph_covid
+
+
+printout
+```
+:::
+
+::: {.column_blue .stackgraph_text}
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Five years of net change in employment for industry sectors, covering pre-pandemic, pandemic, and recovery periods, and percent of pre-pandemic jobs added to date by sector.
+
+**Why it's important:** Five years of net change in employment data highlights the economic strength each sector exhibited heading into the pandemic, as well as the speed of employment recovery. Percent of pre-pandemic jobs added indicates how fast an industry has moved beyond recovery.
+
+**Key Takeaways:**
+
+-   All industry sectors in DFW are showing five-year gains in employment and are exceeding pre-pandemic employment levels in Dec. 2023. Professional & business services; trade, transportation & utilities; and financial activities comprise 65% of those gains.
+
+-   Although leisure and hospitality sector employment increased by 5.8% in Dec. 2023, the industry lost more jobs than all other sectors combined in April 2020, which is reflected in smaller growth beyond pre-pandemic levels compared with other sectors. On the other end of the scale, the professional and business services sector is 25% larger today than pre-pandemic.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::
+
+## Employment By Texas Region
+
+::::: container
+::: column
+### EMPLOYMENT BY TEXAS REGION {.asym-slide-title}
+
+```{r echo=FALSE, cache=TRUE}
+emp_by_region <- get_n_series_table(
+  c(
+    "SMU48000000000000001",
+    "SMU48124200000000001",
+    "SMU48191000000000001",
+    "SMU48264200000000001",
+    "SMU48417000000000001"
+  ),
+  api_key = blskey,
+  start_year = endyear - 6,
+  end_year = endyear
+) %>%
+  select(year, period, "Texas" = "SMU48000000000000001", "Austin MSA" = "SMU48124200000000001", "DFW" = "SMU48191000000000001", "Houston MSA" = "SMU48264200000000001", "San Antonio MSA" = "SMU48417000000000001") %>%
+  mutate(period = str_extract(period, "[1-9]+[0-9]*"))
+
+
+emp_region_fiveyear <- emp_by_region %>%
+  mutate(date = paste(period, year, sep = "-")) %>%
+  mutate(date = my(date, locale = Sys.getlocale("LC_TIME"))) %>%
+  arrange(date) %>%
+  mutate(rest_TX = Texas - `Austin MSA` - DFW - `Houston MSA` - `San Antonio MSA`) %>%
+  mutate(
+    rest_tx_change = rest_TX - lag(rest_TX, 12),
+    austin_change = `Austin MSA` - lag(`Austin MSA`, 12),
+    dfw_change = DFW - lag(DFW, 12),
+    houston_change = `Houston MSA` - lag(`Houston MSA`, 12),
+    san_antonio_change = `San Antonio MSA` - lag(`San Antonio MSA`, 12)
+  ) %>%
+  pivot_longer(cols = rest_tx_change:san_antonio_change, names_to = "Region", values_to = "Employment") %>%
+  select(date, Region, Employment) %>%
+  filter(!is.na(Employment))
+
+# emp_region_fiveyear2 <- emp_by_region %>%
+#   mutate(date = paste(period, year, sep = "-")) %>%
+#   mutate(date = my(date, locale = Sys.getlocale("LC_TIME"))) %>%
+#   arrange(date) %>%
+#   mutate(tx_change = 100+100*((Texas - lag(Texas, 12))/lag(Texas, 12)),
+#          austin_change = 100+100*((`Austin MSA` - lag(`Austin MSA`, 12))/lag(`Austin MSA`, 12)),
+#          dfw_change = 100+100*((DFW - lag(DFW, 12))/lag(DFW, 12)),
+#          houston_change = 100+100*((`Houston MSA` - lag(`Houston MSA`, 12))/lag(`Houston MSA`, 12)),
+#          san_antonio_change = 100+100*((`San Antonio MSA` - lag(`San Antonio MSA`, 12))/lag(`San Antonio MSA`, 12))) %>%
+#   pivot_longer(cols = tx_change:san_antonio_change, names_to = "Region", values_to = "Employment") %>%
+#   select(date, Region, Employment)
+
+
+emp_region_fiveyear_graph <- ggplot(emp_region_fiveyear, aes(x = date, y = Employment, color = Region)) +
+  geom_line(linewidth = 1.2) +
+  scale_color_viridis(discrete = TRUE, option = "A", begin = 0.2, end = 0.8, labels = c("Austin", "DFW", "Houston", "Rest of Texas", "San Antonio")) +
+  # scale_color_viridis(discrete = TRUE, option = "H", begin = 0.15, end = 0.85, labels = c("Austin", "DFW", "Houston", "Rest of Texas", "San Antonio")) +
+  scale_y_continuous(limits = c(-400, 500), breaks = seq(-400, 500, by = 100)) +
+  scale_x_date(date_breaks = "6 months", date_labels = "%b '%y", expand = c(0, 0), limits = c(as.Date(max(emp_region_fiveyear$date[emp_region_fiveyear$Region == "dfw_change"])) %m+% years(-5), as.Date(max(emp_region_fiveyear$date[emp_region_fiveyear$Region == "dfw_change"])))) + # EXPAND PARAMETER PUTS LINEs TO EDGE
+  coord_cartesian(clip = "off", xlim = c(as.Date(max(emp_region_fiveyear$date[emp_region_fiveyear$Region == "dfw_change"])) %m+% years(-5), as.Date(max(emp_region_fiveyear$date[emp_region_fiveyear$Region == "dfw_change"])))) +
+  theme(
+    axis.text.x = element_text(angle = 45),
+    plot.title = element_text(hjust = 0.5, size = 13),
+    plot.subtitle = element_text(hjust = 0.5, size = 6),
+    plot.caption = element_text(face = "italic", color = "#676767", hjust = -0.1),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "black"),
+    panel.border = element_rect(color = "black", fill = NA),
+    axis.text.x.bottom = element_text(vjust = 0.6),
+    axis.title = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    plot.margin = margin(5, 90, 5, 5), "cm"
+  ) + # MARGIN = T, R, B, L
+  labs(
+    title = "YoY Net Change in major Texas MSA Employment, <Insert Date>",
+    caption = "Source: BLS. Slide last updated <INSERT DATE>"
+  ) +
+  geom_text_repel(
+    aes(label = ifelse(date == max(date[Region == "dfw_change"]),
+      paste0(case_when(
+        Region == "rest_tx_change" ~ "Rest of Texas",
+        Region == "dfw_change" ~ "DFW",
+        Region == "houston_change" ~ "Houston",
+        Region == "austin_change" ~ "Austin",
+        Region == "san_antonio_change" ~ "San Antonio",
+        TRUE ~ NA_character_
+      ), ",", format(Employment, digits = 2)),
+      NA
+    )),
+    show.legend = FALSE,
+    force = 1,
+    direction = "y",
+    hjust = -0.1,
+    xlim = c(as.Date(max(emp_region_fiveyear$date[emp_region_fiveyear$Region == "dfw_change"])) %m+% months(1), as.Date(max(emp_region_fiveyear$date[emp_region_fiveyear$Region == "dfw_change"])) %m+% years(1)),
+    size = 3
+  )
+
+# %>%
+#    pivot_wider(names_from = year, values_from = Employment, names_prefix = "emp") %>%
+#    mutate(empchange_ct = get(paste0("emp", endyear))-get(paste0("emp", endyear-1))) %>%
+#    mutate(empchange_pct = 100*(empchange_ct/get(paste0("emp", endyear-5)))) %>%
+#    pivot_longer(names_to = "variable", values_to = "value", cols = empchange_ct:empchange_pct)
+
+
+# SMU48000000000000001 - Texas Statewide
+# SMU48124200000000001 - Austin-Round Rock MSA
+# SMU48191000000000001 - Dallas-Fort Worth MSA
+# SMU48264200000000001 - Houston-The Woodlands-Sugar Land MSA
+# SMU48417000000000001 - San Antonio-New Braunfels MSA
+# NOT SEASONALLY ADJUSTED
+```
+
+```{r emp_region, fig.width = 8, fig.asp=0.7, dpi=300}
+# par(mar=c(5,5,0.1,5))
+
+plot(emp_region_fiveyear_graph)
+```
+:::
+
+::: column_blue
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Year-over-year (YOY) net change in employment for the largest Texas metropolitan statistical areas (MSAs).
+
+**Why it's important:** The four largest MSAs in Texas account for about three-fourths of employment in the state. Pandemic-related job losses were also concentrated in urban areas, so recovery in these locations largely dictates how well the state has recovered.
+
+**Key Takeaways:**
+
+-   In Dec. 2023, large Texas MSAs accounted for 69% of YOY statewide job gains and 72% of total jobs in the state. New jobs outside large MSAs showed continued high numbers in Dec. 2023.
+
+-   In Dec. 2023, the Dallas MSA exceeded peak pre-pandemic job levels (114%). This rebound is second among large Texas metros behind Austin, although DFW is creating more than four times as many total jobs as Austin over a twelve-month period.
+
+-   From June 2010 through March 2020, the Dallas MSA created jobs without interruption, while other Texas metros periodically endured the impacts of energy and/or climate-related shocks. Although COVID-19 ended this growth streak, strong economic fundamentals have helped recovery come faster for the Dallas MSA than the rest of nation.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::
+
+## Employment By Metro Division
+
+::::: container
+::: column
+### EMPLOYMENT BY TEXAS REGION {.asym-slide-title}
+
+```{r echo=FALSE, cache=TRUE}
+emp_by_division <- get_n_series_table(
+  c(
+    "SMU48191000000000001",
+    "SMU48191240000000001",
+    "SMU48231040000000001"
+  ),
+  api_key = blskey,
+  start_year = endyear - 6,
+  end_year = endyear
+) %>%
+  select(year, period, "DFW_msa" = "SMU48191000000000001", "dallas_md" = "SMU48191240000000001", "fort_worth_md" = "SMU48231040000000001") %>%
+  mutate(period = str_extract(period, "[1-9]+[0-9]*"))
+
+
+emp_division_fiveyear <- emp_by_division %>%
+  mutate(date = paste(period, year, sep = "-")) %>%
+  mutate(date = my(date, locale = Sys.getlocale("LC_TIME"))) %>%
+  arrange(date) %>%
+  mutate(
+    dfw_change = DFW_msa - lag(DFW_msa, 12),
+    dallas_md_change = dallas_md - lag(dallas_md, 12),
+    fort_worth_md_change = fort_worth_md - lag(fort_worth_md, 12)
+  ) %>%
+  pivot_longer(cols = dallas_md_change:fort_worth_md_change, names_to = "Region", values_to = "Employment") %>%
+  select(date, dfw_change, Region, Employment) %>%
+  filter(!is.na(Employment))
+
+
+
+
+
+
+
+################### FIX GRAPH SO DALLAS MSA ISN'T PART OF STACK########################
+
+
+emp_division_fiveyear_graph <- ggplot(emp_division_fiveyear, ) +
+  geom_bar(aes(x = date, y = Employment, fill = Region), stat = "identity") +
+  geom_line(aes(x = date, y = dfw_change), linewidth = 1.2, lineend = "round") +
+  scale_x_date(date_breaks = "6 months", date_labels = "%b '%y", expand = c(0, 0), limits = c(as.Date(max(emp_division_fiveyear$date)) %m+% years(-5), as.Date(max(emp_division_fiveyear$date)))) +
+  # scale_fill_manual(labels = c("Dallas MD", "Fort Worth MD"), values = c("dallas_md_change" = "#00A6E9", "fort_worth_md_change" = "#D03137")) +
+  scale_fill_viridis(discrete = TRUE, option = "A", begin = 0.4, end = 0.8, labels = c("Dallas MD", "Fort Worth MD")) +
+  theme(
+    axis.text.x = element_text(angle = 45),
+    plot.title = element_text(hjust = 0.5, size = 13),
+    plot.subtitle = element_text(hjust = 0.5, size = 6),
+    plot.caption = element_text(face = "italic", color = "#676767", hjust = -0.05),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "black"),
+    panel.border = element_rect(color = "black", fill = NA),
+    axis.text.x.bottom = element_text(vjust = 0.6),
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    plot.margin = margin(5, 30, 5, 5), "cm",
+    axis.title = element_blank()
+  ) +
+  labs(
+    title = "YoY Net Change in DFW MSA and MD employment (Thousands), <Insert Date>",
+    caption = "Source: BLS. Slide last updated <INSERT DATE>"
+  )
+
+# %>%
+#    pivot_wider(names_from = year, values_from = Employment, names_prefix = "emp") %>%
+#    mutate(empchange_ct = get(paste0("emp", endyear))-get(paste0("emp", endyear-1))) %>%
+#    mutate(empchange_pct = 100*(empchange_ct/get(paste0("emp", endyear-5)))) %>%
+#    pivot_longer(names_to = "variable", values_to = "value", cols = empchange_ct:empchange_pct)
+
+
+# SMU48191000000000001 DFW MSA
+# SMU48191240000000001 Dallas MD
+# SMU48231040000000001 Fort Worth MD
+# NOT SEASONALLY ADJUSTED
+```
+
+```{r emp_div, fig.width = 8, fig.asp=0.7, dpi=300}
+plot(emp_division_fiveyear_graph)
+```
+:::
+
+::: column_blue
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Year-over-year (YOY) net change in employment for the DFW metropolitan statistical area (MSA) and metro divisions (MD).
+
+**Why it's important:** Assessing employment by MD offers a more granular view of where changes are occurring within the MSA. This is particularly important because the industrial mix is different between the Dallas and Fort Worth MDs.
+
+**Key Takeaways:**
+
+-   The Dallas MD accounted for 75% (101,000) of the region’s 134,200 job gains in Dec. 2023, compared with 25% (33,200) in the Fort Worth MD.​
+
+-   In Dec. 2023, employment in the Dallas MD is 115% of pre-pandemic totals. Dallas regained pandemic job losses by July 2021. Fort Worth MD job totals are 111% of pre-pandemic levels. Fort Worth regained pandemic job losses by September 2021. 
+
+-   The Dallas MD relies more heavily on the professional and business services, financial activities, and information sectors for employment than Fort Worth. The Fort Worth MD is more dependent on the trade, transportation, and utilities; mining, logging, and construction; and manufacturing sectors for employment than Dallas.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::
+
+## Unemployment
+
+::::: container
+::: column
+### UNEMPLOYMENT RATE {.asym-slide-title}
+
+```{r echo=FALSE, cache=TRUE}
+unemp_by_area <- get_n_series_table(
+  c(
+    "LNU04000000",
+    "LAUST480000000000003",
+    "LAUMT481910000000003"
+  ),
+  api_key = blskey,
+  start_year = endyear - 16,
+  end_year = endyear
+) %>%
+  select(year, period, "us" = "LNU04000000", "texas" = "LAUST480000000000003", "dfw" = "LAUMT481910000000003") %>%
+  mutate(period = str_extract(period, "[1-9]+[0-9]*"))
+
+
+unemp_area_fiveyear <- unemp_by_area %>%
+  mutate(date = paste(period, year, sep = "-")) %>%
+  mutate(date = my(date, locale = Sys.getlocale("LC_TIME"))) %>%
+  arrange(date) %>%
+  pivot_longer(cols = us:dfw, names_to = "Region", values_to = "Unemployment") %>%
+  select(date, Region, Unemployment) %>%
+  filter(!is.na(Unemployment)) %>%
+  filter(date >= as.Date("2019-08-01"))
+
+
+unemp_area_fiveyear_graph <- ggplot(unemp_area_fiveyear, aes(x = date, y = Unemployment, color = Region)) +
+  geom_line(linewidth = 1.25) +
+  scale_color_viridis(discrete = TRUE, option = "A", begin = 0.4, end = 0.8, labels = c("DFW", "Texas", "US")) +
+  scale_y_continuous(limits = c(2, 15), breaks = seq(0, 15, by = 3)) +
+  scale_x_date(date_breaks = "6 months", date_labels = "%b '%y", expand = c(0, 0), limit = c(as.Date(max(unemp_area_fiveyear$date)) %m+% years(-5), as.Date(max(unemp_area_fiveyear$date)))) +
+  theme(
+    axis.text.x = element_text(angle = 45),
+    plot.title = element_text(hjust = 0.5, size = 13),
+    plot.subtitle = element_text(hjust = 0.5, size = 6),
+    plot.caption = element_text(face = "italic", color = "#676767", hjust = -0.05),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "black"),
+    panel.border = element_rect(color = "black", fill = NA),
+    axis.text.x.bottom = element_text(vjust = 0.6),
+    axis.title = element_blank(),
+    plot.margin = margin(5, 40, 5, 5), "cm",
+    legend.position = "bottom",
+    legend.title = element_blank()
+  ) +
+  labs(
+    title = "Unemployment rate (U-3), Dec. 2019-2024",
+    caption = "Source: BLS. Slide last updated <INSERT DATE>"
+  ) +
+  geom_text_repel(
+    aes(label = ifelse(date == max(date[Region == "dfw"]),
+      paste0(
+        format(Unemployment, digits = 2),
+        "%",
+        " ",
+        case_when(
+          Region == "us" ~ "US",
+          Region == "texas" ~ "Texas",
+          Region == "dfw" ~ "DFW",
+          TRUE ~ NA_character_
+        )
+      ),
+      NA
+    )),
+    show.legend = FALSE,
+    force = 5,
+    nudge_y = 3,
+    direction = "x"
+  )
+
+# %>%
+#    pivot_wider(names_from = year, values_from = Employment, names_prefix = "emp") %>%
+#    mutate(empchange_ct = get(paste0("emp", endyear))-get(paste0("emp", endyear-1))) %>%
+#    mutate(empchange_pct = 100*(empchange_ct/get(paste0("emp", endyear-5)))) %>%
+#    pivot_longer(names_to = "variable", values_to = "value", cols = empchange_ct:empchange_pct)
+
+
+# LNU04000000 United States
+# LAUST480000000000009 Texas
+# LAUMT481910000000006 DFW MSA
+# NOT SEASONALLY ADJUSTED
+
+
+
+
+
+#########  GREAT RECESSION SUB-PLOT ############
+
+unemp_area_greatrecess <- unemp_by_area %>%
+  mutate(date = paste(period, year, sep = "-")) %>%
+  mutate(date = my(date, locale = Sys.getlocale("LC_TIME"))) %>%
+  arrange(date) %>%
+  pivot_longer(cols = us:dfw, names_to = "Region", values_to = "Unemployment") %>%
+  select(date, Region, Unemployment) %>%
+  filter(!is.na(Unemployment)) %>%
+  filter(date >= as.Date("2009-06-01"))
+
+
+unemp_area_greatrecess_graph <- ggplot(unemp_area_greatrecess, aes(x = date, y = Unemployment, color = Region)) +
+  geom_line(linewidth = 0.75) +
+  scale_color_viridis(discrete = TRUE, option = "A", begin = 0.4, end = 0.8, labels = c("DFW", "Texas", "US")) +
+  scale_y_continuous(limits = c(2, 15), breaks = seq(0, 15, by = 3)) +
+  scale_x_date(date_breaks = "1 years", date_labels = "%b '%y", expand = c(0, 0)) +
+  theme(
+    axis.text.x = element_text(angle = 45),
+    plot.title = element_text(hjust = 0.5, vjust = 0, size = 9),
+    plot.subtitle = element_text(hjust = 0.5, size = 4),
+    plot.background = element_rect(color = "black", fill = "#e4e4e4"),
+    plot.margin = unit(c(0, 0.1, 0, 0.1), "cm"),
+    panel.background = element_rect(color = "white", fill = "white"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "black"),
+    panel.border = element_rect(color = "black", fill = NA),
+    axis.text.x.bottom = element_text(vjust = 0.6, size = 7),
+    axis.title = element_blank(),
+    legend.position = "none",
+    legend.title = element_blank()
+  ) +
+  labs(title = "Since the Great Recession")
+
+######## ALTERNET SUB-PLOT ############
+
+unemp_area_zoom <- unemp_by_area %>%
+  mutate(date = paste(period, year, sep = "-")) %>%
+  mutate(date = my(date, locale = Sys.getlocale("LC_TIME"))) %>%
+  arrange(date) %>%
+  pivot_longer(cols = us:dfw, names_to = "Region", values_to = "Unemployment") %>%
+  select(date, Region, Unemployment) %>%
+  filter(!is.na(Unemployment)) %>%
+  filter(date >= as.Date("2022-03-01"))
+
+
+unemp_area_zoom_graph <- ggplot(unemp_area_zoom, aes(x = date, y = Unemployment, color = Region)) +
+  geom_line(linewidth = 0.75) +
+  scale_color_viridis(discrete = TRUE, option = "A", begin = 0.4, end = 0.8, labels = c("DFW", "Texas", "US")) +
+  scale_y_continuous(limits = c(3, 5), breaks = seq(0, 5, by = 1)) +
+  scale_x_date(date_breaks = "6 months", date_labels = "%b %y", expand = c(0, 0)) +
+  theme(
+    axis.text.x = element_text(angle = 45),
+    plot.title = element_text(hjust = 0.5, vjust = 0, size = 9),
+    plot.subtitle = element_text(hjust = 0.5, size = 4),
+    plot.background = element_rect(color = "black", fill = "#e4e4e4"),
+    plot.margin = unit(c(0, 0.1, 0, 0.1), "cm"),
+    panel.background = element_rect(color = "white", fill = "white"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "black"),
+    panel.border = element_rect(color = "black", fill = NA),
+    axis.text.x.bottom = element_text(vjust = 0.6, size = 7),
+    axis.title = element_blank(),
+    legend.position = "none"
+  ) +
+  labs(title = "Post-Covid")
+
+
+# NOTE CONSIDER USING inset_element() TO MAKE SUBPLOTS NEXT
+# MAY BE EASIER THAN DEFINING LAYOUT USING AREA COMMAND
+
+
+
+
+
+
+
+
+
+######################################
+
+
+
+
+
+layout_unemp <- c(
+  area(t = 1, l = 1, b = 8, r = 8),
+  area(t = 1, l = 5, b = 4, r = 8)
+)
+
+################################################
+```
+
+```{r emp_div2, fig.width = 8, fig.asp=0.7, dpi=300}
+# par(mar=c(5,5,0.1,0.1))
+
+# plot(unemp_area_fiveyear_graph)
+
+# unemp_area_fiveyear_graph + unemp_area_zoom_graph +
+#   plot_layout(design = layout_unemp)
+
+unemp_area_fiveyear_graph + inset_element(unemp_area_greatrecess_graph,
+  left = 0.6,
+  bottom = 0.45,
+  top = 1,
+  right = 1
+)
+```
+:::
+
+::: column_blue
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Percentage of the regional, state, and national civilian workforce who are not employed, but desire to have a job (also known as U-3).
+
+**Why it's important:** The official unemployment rate (UR) applies to people who want to work but who are not attached to a job. U-3 is one of the most important economic indicators available because it signals the relative efficiency of the labor market and/or health of the economy (or sector). Along with containing inflation, keeping the economy close to full employment drives monetary policy.
+
+**Key Takeaways:**
+
+-   In Dec. 2023, the Dallas Region recorded an unemployment rate of 3.3%, holding steady from November. This stands in stark contrast to the pandemic-induced high of 12.1% registered in April 2020. The most recent data indicates that the national UR remained constant in Jan. 2024 at 3.7% while the Texas UR fell by 0.1 percentage point to 4.0% in December.
+
+-   During the Great Recession, the Dallas Region saw a peak U-3 of 8.7% – 3.4 percentage points lower than the pandemic high. However, the previous recovery took 70 months to fall below 4.0% compared with 19 months during the pandemic recovery.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::
+
+## Inflation
+
+```{r echo=FALSE}
+# inflationgraph <- ggplot(cpitables, aes(x = date, y = value, color = variable))period()inflationgraph <- ggplot(cpitables, aes(x = date, y = value, color = variable)) +
+#   geom_point() +
+#   scale_color_viridis(discrete = TRUE)
+
+
+
+
+
+
+cpi_oneyear_graph <- ggplot(cpi_rates_oneyear, aes(x = category, y = value, fill = region)) +
+  geom_bar(position = "dodge", stat = "identity", color = "black") +
+  scale_fill_viridis(discrete = TRUE, labels = c("DFW", "Large Cities", "US", "West South Central")) +
+  scale_x_discrete(labels = c("All Items", "Core", "Energy", "Food")) +
+  scale_y_continuous(limits = c(-5, 5), breaks = seq(-10, 4, by = 2)) +
+  theme(
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5, size = 13),
+    plot.subtitle = element_text(hjust = 0.5, size = 9),
+    plot.caption = element_text(face = "italic", color = "#676767", hjust = -0.05),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "black"),
+    # panel.grid.minor.y = element_line(color = "black"),
+    panel.border = element_rect(color = "black", fill = NA),
+    axis.text.x.bottom = element_text(vjust = 0.6),
+    axis.title = element_blank(),
+    legend.position = "bottom",
+    legend.title = element_blank()
+  ) +
+  geom_text(aes(label = format(value, digits = 2), vjust = ifelse(value > 0, -1, 2)), size = 3.5, position = position_dodge(width = 0.9), hjust = 0.6) +
+  labs(title = "YoY Percent Change in Consumer Price Index, <Insert Date>", caption = "Source: BLS. Slide last updated <INSERT DATE>")
+
+
+
+
+inflationgraphrate <- ggplot(cpi_rate_dfw, aes(x = date, y = value, color = variable)) +
+  geom_line(linewidth = 1.2) +
+  scale_color_viridis(discrete = TRUE, labels = c("All CPI Items", "Core CPI"), option = "A", begin = 0.4, end = 0.8) +
+  scale_y_continuous(limits = c(-1, 10), breaks = seq(0, 10, by = 2)) +
+  scale_x_date(
+    date_breaks = "6 months", date_labels = "%b '%y", expand = c(0, 0),
+    limits = c(as.Date(max(cpi_rate_dfw$date)) %m+% years(-5), as.Date(max(cpi_rate_dfw$date)))
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, size = 12),
+    axis.text.y = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5, size = 13),
+    plot.subtitle = element_text(hjust = 0.5, size = 9),
+    plot.caption = element_text(face = "italic", color = "#676767", hjust = -0.05),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "black"),
+    # panel.grid.minor.y = element_line(color = "black"),
+    panel.border = element_rect(color = "black", fill = NA),
+    axis.text.x.bottom = element_text(vjust = 0.6),
+    axis.title = element_blank(),
+    legend.position = "bottom",
+    plot.margin = margin(5, 40, 5, 5), "cm",
+    legend.title = element_blank()
+  ) +
+  labs(title = "YoY Percent Change in Consumer Price Index, <Insert Date Range>", caption = "Source: BLS. Slide last updated <INSERT DATE>") +
+  geom_text_repel(
+    aes(label = ifelse(date == max(date),
+      paste0(
+        format(value, digits = 2),
+        " ",
+        case_when(
+          variable == "dfw.all.items.change" ~ "All CPI Items",
+          variable == "dfw.core.change" ~ "Core CPI",
+          TRUE ~ NA_character_
+        )
+      ),
+      NA
+    )),
+    show.legend = FALSE,
+    force = 5,
+    nudge_y = -1.5,
+    direction = "x"
+  )
+
+
+
+
+
+
+
+#### BLS API CODES FOR CPI
+
+
+# CUUR0000SA0
+# CUUR0000SA0E
+# CUUR0000SA0L1E
+# CUUR0000SAF1
+# CUUR0370SA0
+# CUUR0370SA0E
+# CUUR0370SA0L1E
+# CUUR0370SAF1
+# CUURS000SA0
+# CUURS000SA0E
+# CUURS000SA0L1E
+# CUURS000SAF1
+# CUURS37ASA0
+# CUURS37ASA0E
+# CUURS37ASA0L1E
+# CUURS37ASAF1
+```
+
+::::: container
+::: column
+### INFLATION {.asym-slide-title}
+
+```{r inflation_1, fig.width = 8, fig.asp=0.6, dpi=300}
+par(mar = c(5, 5, 0.1, 0.1))
+
+plot(inflationgraphrate)
+```
+:::
+
+::: column_blue
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Year-over-year (YOY) percent change in the consumer price index (CPI) for the Dallas Region over the past 5 years.
+
+**Why it's important:** CPI is a measure of the changing cost of a basket of goods and services over time. It serves as an indicator of how far household income can stretch. Energy and food costs are generally considered more volatile than other CPI items. Setting them aside produces a measure of “core inflation.” Along with keeping unemployment rates low, containing inflation drives monetary policy.
+
+**Key Takeaways:**
+
+-   DFW’s inflation rate for Jan. 2024 was 5.3%, up slightly from 5.2% in the previous reporting period. Food, recreation, transportation, tuition, and shelter costs contributed to this increase while lower energy (especially gasoline) and medical costs help to offset greater increases.
+
+-   In Jan. 2024, DFW’s core inflation rate was 6.2%, unchanged from the previous reporting period. DFW continues to outpace the national average of 3.9% by 2.3 percentage points. High costs related to shelter in DFW, continues as the driving factor in keeping core inflation elevated.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::
+
+## Inflation 2
+
+::::: container
+::: column
+### INFLATION {.asym-slide-title}
+
+```{r inflation_2, fig.width = 8, fig.asp=0.6, dpi=300}
+par(mar = c(5, 5, 0.1, 0.1))
+
+plot(cpi_oneyear_graph)
+```
+:::
+
+::: column_blue
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Year-over-year (YOY) percent change in the consumer price index (CPI) for the Dallas Region, Texas, large cities (\>2.5M population), and the U.S. city average.
+
+**Why it's important:** CPI is a measure of the changing cost of a basket of goods and services over time. It serves as an indicator of how far household income can stretch. Energy and food costs are generally considered more volatile than other CPI items. Setting them aside produces a measure of “core inflation.” Along with keeping unemployment rates low, containing inflation drives monetary policy.
+
+**Key Takeaways:**
+
+-   In Jan. 2024, DFW experienced higher than average inflation rates for all CPI items, as well as for core items. Overall inflation in DFW is 5.3% over the previous year (up from 5.2% in Nov. 2023) and core inflation is 6.2% (unchanged from the previous period), primarily due to the cost of shelter.
+
+-   At -1.7% in Jan. 2024, energy inflation in the DFW is higher than the U.S. average, though prices remain cheaper than twelve months ago. At 4.4%, food price inflation in DFW is higher than the rest of the country largely due to food away from home (e.g. restaurants), although the rate of increase has fallen 0.7 percentage points since the previous period.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::
+
+## Consumer Spending
+
+::::: container
+::: column
+### CONSUMER SPENDING {.asym-slide-title}
+
+![](Consumer%20Spending%20Placeholder.png)
+:::
+
+::: column_blue
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Consumer spending data gathered from credit and debit card purchases indexed against pre-pandemic spending behaviors.
+
+**Why it's important:** Consumer spending is widely viewed as an indicator of public confidence and the health of the economy as it represents 70% of gross domestic product.
+
+**Key Takeaways:**
+
+-   As of Dec. 31, 2023, consumer spending exceeded pre-pandemic levels in Dallas (4%), Fort Worth (+13%), and the U.S. (12%).
+
+-   2023 spending levels in DFW were consistently above normal pre-pandemic consumer behavior. Spending in Dallas fluctuated between +6% to +20% above normal patterns. Increased spending in Fort Worth was generally higher than in Dallas, ranging between +7% to +26% higher than pre-pandemic behavior.
+
+-   While the pace of inflation slowed in DFW throughout 2023, it remained higher than the national average. In Nov. 2023, DFW inflation once again turned upward even as the Fed considers reducing its benchmark lending rate in 2024.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::
+
+## Consumer Spending 2
+
+::::: container
+::: column
+### CONSUMER SPENDING {.asym-slide-title}
+
+![](Consumer%20Spending%20Placeholder%202.png)
+:::
+
+::: column_blue
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Consumer spending data gathered from credit and debit card purchases by select industry segments.
+
+**Why it's important:** Pandemic-related impacts on consumer purchases vary widely by segment. Shifts in consumer spending among segments can signal behavior changes and supply chain impacts that inform fiscal, monetary, and public policy responses.
+
+**Key Takeaways:**
+
+-   Consumer spending in DFW flattened and even declined in some segments in 2023.
+
+-   Restaurant and hotel spending in the Dallas Region began returning to normal in conjunction with vaccine distribution in March 2021. Spending remained high in Fort Worth in this segment throughout 2023 but began a downward trend in Dallas.
+
+-   Retail and transportation spending followed diverging pathways during the pandemic/ recovery periods. The retail segment has driven an overall increase in consumer spending, but inflationary pressure began to impact this behavior at the end of 2022 which continued to decline throughout 2023. Transportation spending only reached pre-pandemic levels in early 2022 and remained volatile throughout 2023 falling well below normal as of Dec. 31, 2023.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::
+
+## Fortune 500 Companies
+
+::::: container
+::: column
+### FORTUNE 500 COMPANIES {.asym-slide-title}
+
+![](Fortune%20500%20Placeholder.png)
+:::
+
+::: column_blue
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Largest public companies in the United States, ranked by 2022 revenues and headquarter (HQ) locations.
+
+**Why it's important:** Attracting and retaining the HQs of the biggest companies in the U.S can serve as a proxy indicator for the ease of doing business or superior quality of life in a region. Tangible benefits associated with HQ locations include high paying jobs, contributions to GDP, and attraction of goods and services providers within the Fortune 500 company’s supply chain.
+
+**Key Takeaways:**
+
+-   The Dallas Region is home to 2 of the top 10 Fortune 500 companies. New York, Los Angeles, and Chicago have none.
+
+-   The Dallas Region’s 24 Fortune 500 companies represent the 4th largest concentration in the U.S.
+
+-   Revenues generated by Dallas Region Fortune 500 companies totaled more than \$1.35T in 2022, the second highest total among metros behind New York.
+
+-   Most recently, Caterpillar announced a relocation to Irving in 2022. Jacobs Engineering reorganized and became a subsidiary of Jacobs Solutions holding company.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::
+
+## Population Change 1
+
+::::: container
+::: column
+### POPULATION CHANGE {.asym-slide-title}
+
+![](Population%20Change%20Placeholder.png)
+:::
+
+::: column_blue
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Annual estimates of population change from natural causes (births minus deaths) and net migration (both domestic and international) for the Dallas Region.
+
+**Why it's important:** Population change broadly describes the health of a metropolitan economy. Changes in each component hint at different conditions. For instance, declining natural increases can indicate an aging population. Net negative migration can indicate impending talent deficits.
+
+**Key Takeaways:**
+
+-   The Dallas Region has been on a run of population growth for several decades topping more than one million new residents every 10 years since 1980.
+
+-   In 2022, DFW added an annual record-topping 170,000 new residents representing 36% of population growth for the entire state of Texas.
+
+-   On average, population in the Dallas Region increased by nearly 467 people per day in 2022.
+
+-   By 2050, population projections indicate that the DFW will be larger than Chicago to become the 3rd largest metropolitan area in the U.S.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::
+
+## Population Change 2
+
+::::: container
+::: column
+### POPULATION CHANGE {.asym-slide-title}
+
+![](Population%20Change%20Placeholder%202.png)
+:::
+
+::: column_blue
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Comparative estimates of total metropolitan population, and net and percent population change among the largest U.S. metros.
+
+**Why it's important:** Population growth and rates of growth offer different insights into overall population change, especially considering the initial size of population.
+
+**Key Takeaways:**
+
+-   Among the largest U.S. metros, the Dallas Region has led in annual estimated population growth, rate of growth, or both throughout the past decade. In 2022, DFW added an annual record 170,000 people, more than any other metro. This represents nearly 50,000 more people than 2nd place Houston.
+
+-   The Dallas Region grew by 2.2% in 2022, 0.5 percentage points more than the next highest growth rate among the largest metros (Houston at 1.7%). Two-fifths of the 50 biggest metro areas lost population or saw no growth.
+
+-   The three metros larger than DFW saw declining populations: New York shrank in population by 157,000; Los Angeles lost 101,000 people; and Chicago lost 78,000 people.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::
+
+## Business Activity Impacts {data-background-image="Microsoft Teams Backdrops_DRC-Deloitte_Light Gray Gradient.jpg"}
+
+::::: container
+::: column
+### BUSINESS ACTIVITY IMPACTS {.asym-slide-title}
+
+![](Business%20Activity%20Impacts%20Placeholder.png)
+:::
+
+::: column_blue
+![](DRC_COY%20all-white%20horizontal%20logo.png)
+
+**Description:** Statistical model of employment and real gross product outlook for metropolitan divisions in the Dallas Region.
+
+**Why it's important:** The Perryman Group offers a scenario for projected recovery from the pandemic-induced downturn on two key indicators of economic health and the local distribution of those impacts by metropolitan division (MD).
+
+**Key Takeaways:**
+
+-   In 2020, during the height of the pandemic, Perryman concluded that, unlike prior to the Great Depression, the structural foundation of the Texas economy was sound, and “the overall size and scope of activity should return to essentially its prior path."​
+
+-   This analysis proved to be accurate. Dallas-Fort Worth reached pre-pandemic job totals from February 2020 faster than all other large U.S. metros. Through 2028, the Dallas MD is expected to produce 387,000 new jobs, while the Fort Worth MD will contribute an additional 139,000 jobs.
+
+-   Regional gross product is expected to expand by 3.7% in the Dallas MD and by 3.3% in the Fort Worth MD.
+
+-   While Fort Worth is expected to keep pace with overall state economic growth, Dallas is poised to exceed U.S. and state growth.
+
+```{=html}
+<div class="freq-holder">
+<span class="data-freq"> Data Frequency: monthly</span>
+</div>
+```
+:::
+:::::

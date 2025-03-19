@@ -50,11 +50,31 @@ blskey <- "0e7e8a25a3354dad812a541ce3ba76bb"
 beakey <- "F7B69740-D892-4F7B-9341-6C82FA77A8AD"
 
 # setwd("C:/Users/cmanty/Dallas Regional Chamber/Research & Innovation - Documents/Economy in Brief")
+
+#### CUSTOM FUNCTIONS
+
+round_up_choose <- function(x, to)
+{
+  x + (to - x %% to)
+}
+
+round_down_choose <- function(x, to)
+{
+  x - (x %% to)
+}
+
+
+#### 
+
+
+
+
+
 ```
 
-```{r echo=FALSE, cache=TRUE}
+```{r echo=FALSE, cache=FALSE}
 startyear <- 2019
-endyear <- 2024
+endyear <- 2025
 
 topline_BLS <- get_n_series_table(
   c(
@@ -328,7 +348,7 @@ US rates are X% and X% respectively
 
 ::::: logofooter_box
 ::: footnote_topline
-\*Bi-monthly data for DFW. Core Inflation excludes food and and energy
+*Bi-monthly data for DFW. Core Inflation excludes food and and energy
 :::
 
 ::: logoflexbox
@@ -336,8 +356,8 @@ US rates are X% and X% respectively
 :::
 :::::
 
-```{r echo=FALSE, cache=TRUE}
-endyear <- 2024
+```{r echo=FALSE, cache=FALSE}
+endyear <- 2025
 
 # count is in thousands of employees
 
@@ -354,14 +374,16 @@ emp_by_metro <- get_n_series_table(
     "SMU36356200000000001",
     "SMU42379800000000001",
     "SMU48191000000000001",
-    "SMU48264200000000001"
+    "SMU48264200000000001",
+    "CEU0000000001"
   ),
   api_key = blskey,
   start_year = endyear - 5,
   end_year = endyear
 ) %>%
-  select(year, period, "Phoenix" = "SMU04380600000000001", "Los Angeles" = "SMU06310800000000001", "San Francisco" = "SMU06418600000000001", "Washington DC" = "SMU11479000000000001", "Miami" = "SMU12331000000000001", "Atlanta" = "SMU13120600000000001", "Chicago" = "SMU17169800000000001", "Boston" = "SMU25144600000000001", "NYC" = "SMU36356200000000001", "Philadelphia" = "SMU42379800000000001", "Dallas" = "SMU48191000000000001", "Houston" = "SMU48264200000000001") %>%
-  mutate(period = str_extract(period, "[1-9]+[0-9]*"))
+  select(year, period, "Phoenix" = "SMU04380600000000001", "Los Angeles" = "SMU06310800000000001", "San Francisco" = "SMU06418600000000001", "Washington DC" = "SMU11479000000000001", "Miami" = "SMU12331000000000001", "Atlanta" = "SMU13120600000000001", "Chicago" = "SMU17169800000000001", "Boston" = "SMU25144600000000001", "NYC" = "SMU36356200000000001", "Philadelphia" = "SMU42379800000000001", "Dallas" = "SMU48191000000000001", "Houston" = "SMU48264200000000001", "United States" = "CEU0000000001") %>%
+  mutate(period = str_extract(period, "[1-9]+[0-9]*")) %>%
+  filter(!is.na(Dallas))
 
 
 ######### YEAR OVER YEAR ##########
@@ -369,28 +391,30 @@ emp_by_metro <- get_n_series_table(
 emp_metro_yoy <- emp_by_metro %>%
   # filter(year == max(as.numeric(year))) %>%
   filter(period == max(as.numeric(period[year == max(as.numeric(year))]))) %>%
-  pivot_longer(names_to = "Metro", cols = Phoenix:Houston, values_to = "employment") %>%
+  pivot_longer(names_to = "Metro", cols = Phoenix:`United States`, values_to = "employment") %>%
   pivot_wider(names_from = year, values_from = employment, names_prefix = "emp") %>%
-  mutate(empchange_ct = get(paste0("emp", endyear)) - get(paste0("emp", endyear - 1))) %>%
+  mutate(empchange_ct = get(paste0("emp", max(emp_by_metro$year))) - get(paste0("emp", max(emp_by_metro$year) - 1))) %>%
   mutate(empchange_pct = 100 * (empchange_ct / get(paste0("emp", endyear - 1)))) %>%
   pivot_longer(names_to = "variable", values_to = "value", cols = empchange_ct:empchange_pct)
 
 
 emp_by_metro2 <- emp_metro_yoy %>%
-  mutate(value = ifelse(variable == "empchange_pct", value * 30, value)) %>%
-  mutate(label = ifelse(variable == "empchange_pct", (value / 30), value)) %>%
-  mutate(sortvalue = ifelse(variable == "empchange_pct", value * 100, 0))
+  mutate(value = ifelse(variable == "empchange_pct", value * 65, value)) %>%
+  mutate(label = ifelse(variable == "empchange_pct", (value / 65), value)) %>%
+  mutate(sortvalue = ifelse(variable == "empchange_pct", value * 100, 0)) %>%
+  mutate(value = ifelse((Metro == "United States" & variable == "empchange_ct") == FALSE, value, 0)) %>%
+  mutate(label = ifelse((Metro == "United States" & variable == "empchange_ct") == FALSE, label, NA))
 
 # FOR BAR OVERLAY VARIANT
-emp_by_metro3 <- emp_metro_yoy %>%
-  mutate(value = ifelse(variable == "empchange_pct", value * 30, value)) %>%
-  mutate(label = ifelse(variable == "empchange_pct", (value / 30), value)) %>%
-  pivot_wider(names_from = variable, values_from = value)
-
-emp_metro_graph <- ggplot(emp_metro_yoy, aes(reorder(Metro, value), y = value, fill = variable)) +
-  geom_bar(position = "dodge", stat = "identity") +
-  scale_fill_viridis(discrete = TRUE, option = "A") +
-  coord_flip()
+# emp_by_metro3 <- emp_metro_yoy %>%
+#   mutate(value = ifelse(variable == "empchange_pct", value * 30, value)) %>%
+#   mutate(label = ifelse(variable == "empchange_pct", (value / 30), value)) %>%
+#   pivot_wider(names_from = variable, values_from = value)
+# 
+# emp_metro_graph <- ggplot(emp_metro_yoy, aes(reorder(Metro, value), y = value, fill = variable)) +
+#   geom_bar(position = "dodge", stat = "identity") +
+#   scale_fill_viridis(discrete = TRUE, option = "A") +
+#   coord_flip()
 # scale_y_continuous(sec.axis = sec_axis(name = "Percent Change"))
 
 
@@ -443,7 +467,7 @@ emp_metro_graph3 <- ggplot(emp_by_metro2, aes(reorder(Metro, -sortvalue), y = va
   geom_bar(stat = "identity", color = "black", width = c(0.8, 0.5)) +
   scale_fill_manual(values = c("#132361", "#D03137"), labels = c("Count", "Percent Change")) +
   scale_alpha_manual(values = c(0.6, 0.7), guide = "none") +
-  scale_y_continuous(limits = c(-20, 150), breaks = seq(0, 150, by = 25), sec.axis = sec_axis(~ . / 30, name = "Percent")) +
+  scale_y_continuous(limits = c(round_down_choose(min(emp_by_metro2$value), 25), round_up_choose(max(emp_by_metro2$value), 25)), breaks = seq(round_down_choose(min(emp_by_metro2$value), 25), round_up_choose(max(emp_by_metro2$value), 25), by = 25), sec.axis = sec_axis(~ . / 65, name = "Percent")) +
   theme(
     axis.text.x = element_text(angle = 45),
     plot.title = element_text(hjust = 0.5, size = 12),
@@ -459,7 +483,7 @@ emp_metro_graph3 <- ggplot(emp_by_metro2, aes(reorder(Metro, -sortvalue), y = va
     legend.title = element_blank()
   ) +
   labs(
-    subtitle = "YoY Percent Change and Net Change (Thousands) in employment, <Insert Date>",
+    subtitle = "YoY Percent Change and Net Change (Thousands) in Employment, <Insert Date>",
     y = "Change in Employment (Thousands)",
     x = "Industry",
     fill = "Metric",
@@ -467,14 +491,7 @@ emp_metro_graph3 <- ggplot(emp_by_metro2, aes(reorder(Metro, -sortvalue), y = va
   ) +
   geom_text_repel(
     aes(
-      label =
-        paste0(
-          format(label, digits = 1, scientific = FALSE),
-          ifelse(variable == "empchange_pct",
-            "%",
-            ""
-          )
-        )
+      label = ifelse(is.na(label), "", paste0(format(label, digits = 1, scientific = FALSE), ifelse(variable == "empchange_pct","%","")))
     ),
     size = 2,
     vjust = -1,
@@ -488,6 +505,7 @@ emp_metro_graph3 <- ggplot(emp_by_metro2, aes(reorder(Metro, -sortvalue), y = va
 ########## FIVE YEAR ##########
 
 emp_metro_five <- emp_by_metro %>%
+  select(!c("United States")) %>%
   filter(period == max(as.numeric(period[year == max(as.numeric(year))]))) %>%
   pivot_longer(names_to = "Metro", cols = Phoenix:Houston, values_to = "employment") %>%
   pivot_wider(names_from = year, values_from = employment, names_prefix = "emp") %>%
@@ -501,7 +519,7 @@ emp_metro_five <- emp_by_metro %>%
 emp_metro_graph_fiveyear <- ggplot(emp_metro_five, aes(reorder(Metro, -value), y = value, fill = Metro)) +
   geom_bar(position = "dodge", stat = "identity", color = "black", width = 0.6) +
   scale_fill_manual(values = c("Dallas" = "#132361", "Houston" = "#C7C8CA", "Phoenix" = "#C7C8CA", "Miami" = "#C7C8CA", "Atlanta" = "#C7C8CA", "NYC" = "#C7C8CA", "Philadelphia" = "#C7C8CA", "Washington DC" = "#C7C8CA", "Los Angeles" = "#C7C8CA", "Chicago" = "#C7C8CA", "Boston" = "#C7C8CA", "San Francisco" = "#C7C8CA"), labels = "Count") +
-  scale_y_continuous(limits = c(-50, 600), breaks = seq(0, 600, by = 100)) +
+  scale_y_continuous(limits = c(round_down_choose(min(emp_metro_five$value), 100), round_up_choose(max(emp_metro_five$value), 100)), breaks = seq(round_down_choose(min(emp_metro_five$value), 100), round_up_choose(max(emp_metro_five$value), 100), by = 100)) +
   theme(
     axis.text.x = element_text(angle = 45, size = 12),
     axis.text.y = element_text(size = 12),
@@ -525,14 +543,15 @@ emp_metro_graph_fiveyear <- ggplot(emp_metro_five, aes(reorder(Metro, -value), y
 ########## COVID-TO-NOW ###########
 
 emp_metro_covid <- emp_by_metro %>%
+  select(!c("United States")) %>%
   mutate(date = paste(period, year, sep = "-")) %>%
   mutate(date = my(date, locale = Sys.getlocale("LC_TIME"))) %>%
-  filter(date %in% c("2019-12-01", paste0(endyear, "-", ifelse(max(as.numeric(period[year == endyear])) > 9, max(as.numeric(period[year == endyear])), paste0("0", max(as.numeric(period[year == endyear])))), "-", "01"))) %>%
+  filter(date %in% c("2020-02-01", paste0(endyear, "-", ifelse(max(as.numeric(period[year == endyear])) > 9, max(as.numeric(period[year == endyear])), paste0("0", max(as.numeric(period[year == endyear])))), "-", "01"))) %>%
   select(-c(period, date)) %>%
   pivot_longer(names_to = "Metro", cols = Phoenix:Houston, values_to = "employment") %>%
   pivot_wider(names_from = year, values_from = employment, names_prefix = "emp") %>%
-  mutate(empchange_ct = get(paste0("emp", endyear)) - emp2019) %>%
-  mutate(empchange_pct = 100 * (empchange_ct / emp2019)) %>%
+  mutate(empchange_ct = get(paste0("emp", endyear)) - emp2020) %>%
+  mutate(empchange_pct = 100 * (empchange_ct / emp2020)) %>%
   pivot_longer(names_to = "variable", values_to = "value", cols = empchange_ct:empchange_pct) %>%
   filter(variable == "empchange_pct")
 
@@ -540,7 +559,7 @@ emp_metro_covid <- emp_by_metro %>%
 emp_metro_graph_covid <- ggplot(emp_metro_covid, aes(reorder(Metro, -value), y = value, fill = Metro)) +
   geom_bar(position = "dodge", stat = "identity", color = "black", width = 0.6) +
   scale_fill_manual(values = c("Dallas" = "#132361", "Houston" = "#C7C8CA", "Phoenix" = "#C7C8CA", "Miami" = "#C7C8CA", "Atlanta" = "#C7C8CA", "NYC" = "#C7C8CA", "Philadelphia" = "#C7C8CA", "Washington DC" = "#C7C8CA", "Los Angeles" = "#C7C8CA", "Chicago" = "#C7C8CA", "Boston" = "#C7C8CA", "San Francisco" = "#C7C8CA"), labels = "Count") +
-  scale_y_continuous(limits = c(-4, 14), breaks = seq(-4, 14, by = 2)) +
+  scale_y_continuous(limits = c(round_down_choose(min(emp_metro_covid$value), 5), round_up_choose(max(emp_metro_covid$value), 2)), breaks = seq(round_down_choose(min(emp_metro_covid$value), 10), round_up_choose(max(emp_metro_covid$value), 2), by = 2)) +
   theme(
     axis.text.x = element_text(angle = 45, size = 12),
     axis.text.y = element_text(size = 12),
@@ -651,7 +670,7 @@ printout
 ::: column
 ### EMPLOYMENT BY INDUSTRY {.asym-slide-title}
 
-```{r echo=FALSE, cache=TRUE}
+```{r echo=FALSE, cache=FALSE}
 emp_by_ind_dfw <- get_n_series_table(
   c(
     "SMU48191001500000001",
@@ -743,7 +762,7 @@ emp_ind_compare_yoy <- emp_ind_dfw_yoy %>%
 emp_industry_graph_yoy <- ggplot(emp_ind_compare_yoy, aes(reorder(Industry, -sortvalue), y = value, fill = geography)) +
   geom_bar(position = "dodge", stat = "identity", width = 0.7, color = "black") +
   scale_fill_manual(values = c("DFW" = "#132361", "US" = "#C7C8CA")) +
-  scale_y_continuous(limits = c(-1, 5.5), breaks = seq(0, 5, by = 1)) +
+  scale_y_continuous(limits = c(round_down_choose(min(emp_ind_compare_yoy$value), 1), round_up_choose(max(emp_ind_compare_yoy$value), 1)), breaks = seq(round_down_choose(min(emp_ind_compare_yoy$value), 1), round_up_choose(max(emp_ind_compare_yoy$value), 1), by = 1)) +
   theme(
     axis.text.x = element_text(angle = 45, size = 12),
     axis.text.y = element_text(size = 12),
@@ -841,7 +860,7 @@ plot(emp_industry_graph_yoy)
 ::: {.column .stackgraph}
 ### EMPLOYMENT BY INDUSTRY {.asym-slide-title}
 
-```{r echo=FALSE, cache=TRUE}
+```{r emp_industry_2, echo=FALSE, cache=FALSE}
 emp_ind_dfw_fiveyear <- emp_by_ind_dfw %>%
   filter(period == max(as.numeric(period[year == max(as.numeric(year))]))) %>%
   pivot_longer(cols = 3:12, names_to = "Industry", values_to = "Employment") %>%
@@ -861,12 +880,12 @@ emp_ind_dfw_fiveyear <- emp_by_ind_dfw %>%
 emp_ind_dfw_covid <- emp_by_ind_dfw %>%
   mutate(date = paste(period, year, sep = "-")) %>%
   mutate(date = my(date, locale = Sys.getlocale("LC_TIME"))) %>%
-  filter(date %in% c("2019-12-01", paste0(endyear, "-", ifelse(max(as.numeric(period[year == endyear])) > 9, max(as.numeric(period[year == endyear])), paste0("0", max(as.numeric(period[year == endyear])))), "-", "01"))) %>%
+  filter(date %in% c("2020-12-01", paste0(endyear, "-", ifelse(max(as.numeric(period[year == endyear])) > 9, max(as.numeric(period[year == endyear])), paste0("0", max(as.numeric(period[year == endyear])))), "-", "01"))) %>%
   select(-c(period, date)) %>%
   pivot_longer(names_to = "Industry", cols = `Min., Log., & Con.`:Government, values_to = "employment") %>%
   pivot_wider(names_from = year, values_from = employment, names_prefix = "emp") %>%
-  mutate(empchange_ct = get(paste0("emp", endyear)) - emp2019) %>%
-  mutate(empchange_pct = 100 * (empchange_ct / emp2019)) %>%
+  mutate(empchange_ct = get(paste0("emp", endyear)) - emp2020) %>%
+  mutate(empchange_pct = 100 * (empchange_ct / emp2020)) %>%
   pivot_longer(names_to = "variable", values_to = "value", cols = empchange_ct:empchange_pct) %>%
   filter(variable == "empchange_pct")
 
@@ -900,7 +919,7 @@ emp_ind_dfw_covid <- emp_by_ind_dfw %>%
 
 emp_industry_graph_fiveyear <- ggplot(emp_ind_dfw_fiveyear, aes(reorder(Industry, -value), y = value, fill = Industry)) +
   geom_bar(position = "dodge", stat = "identity", fill = "#00A6E9", width = 0.6) +
-  scale_y_continuous(limits = c(0, 160), breaks = seq(0, 150, by = 25)) +
+  scale_y_continuous(limits = c(round_down_choose(min(emp_ind_dfw_fiveyear$value), 25), round_up_choose(max(emp_ind_dfw_fiveyear$value), 25)), breaks = seq(round_down_choose(min(emp_ind_dfw_fiveyear$value), 25), round_up_choose(max(emp_ind_dfw_fiveyear$value), 25), by = 25)) +
   theme(
     axis.text.x = element_text(angle = 45, size = 12),
     axis.text.y = element_text(size = 12),
@@ -922,7 +941,7 @@ emp_industry_graph_fiveyear <- ggplot(emp_ind_dfw_fiveyear, aes(reorder(Industry
 
 emp_industry_graph_covid <- ggplot(emp_ind_dfw_covid, aes(reorder(Industry, -value), y = value, fill = Industry)) +
   geom_bar(position = "dodge", stat = "identity", fill = "#00A6E9", width = 0.6) +
-  scale_y_continuous(limits = c(0, 22.5), breaks = seq(0, 20, by = 5)) +
+  scale_y_continuous(limits = c(round_down_choose(min(emp_ind_dfw_covid$value), 10), round_up_choose(max(emp_ind_dfw_covid$value), 5)), breaks = seq(round_down_choose(min(emp_ind_dfw_covid$value), 10), round_up_choose(max(emp_ind_dfw_covid$value), 5), by = 5)) +
   theme(
     axis.text.x = element_text(angle = 45, size = 12),
     axis.text.y = element_text(size = 12),
@@ -979,7 +998,7 @@ printout
 ::: column
 ### EMPLOYMENT BY TEXAS REGION {.asym-slide-title}
 
-```{r echo=FALSE, cache=TRUE}
+```{r echo=FALSE, cache=FALSE}
 emp_by_region <- get_n_series_table(
   c(
     "SMU48000000000000001",
@@ -1122,7 +1141,7 @@ plot(emp_region_fiveyear_graph)
 ::: column
 ### EMPLOYMENT BY TEXAS REGION {.asym-slide-title}
 
-```{r echo=FALSE, cache=TRUE}
+```{r echo=FALSE, cache=FALSE}
 emp_by_division <- get_n_series_table(
   c(
     "SMU48191000000000001",
@@ -1232,7 +1251,7 @@ plot(emp_division_fiveyear_graph)
 ::: column
 ### UNEMPLOYMENT RATE {.asym-slide-title}
 
-```{r echo=FALSE, cache=TRUE}
+```{r echo=FALSE, cache=FALSE}
 unemp_by_area <- get_n_series_table(
   c(
     "LNU04000000",

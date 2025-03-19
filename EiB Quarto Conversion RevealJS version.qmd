@@ -1048,7 +1048,7 @@ emp_region_fiveyear_graph <- ggplot(emp_region_fiveyear, aes(x = date, y = Emplo
   geom_line(linewidth = 1.2) +
   scale_color_viridis(discrete = TRUE, option = "A", begin = 0.2, end = 0.8, labels = c("Austin", "DFW", "Houston", "Rest of Texas", "San Antonio")) +
   # scale_color_viridis(discrete = TRUE, option = "H", begin = 0.15, end = 0.85, labels = c("Austin", "DFW", "Houston", "Rest of Texas", "San Antonio")) +
-  scale_y_continuous(limits = c(-400, 500), breaks = seq(-400, 500, by = 100)) +
+  scale_y_continuous(limits = c(round_down_choose(min(emp_region_fiveyear$Employment), 100), round_up_choose(max(emp_region_fiveyear$Employment), 100)), breaks = seq(round_down_choose(min(emp_region_fiveyear$Employment), 100), round_up_choose(max(emp_region_fiveyear$Employment), 100), by = 100)) +
   scale_x_date(date_breaks = "6 months", date_labels = "%b '%y", expand = c(0, 0), limits = c(as.Date(max(emp_region_fiveyear$date[emp_region_fiveyear$Region == "dfw_change"])) %m+% years(-5), as.Date(max(emp_region_fiveyear$date[emp_region_fiveyear$Region == "dfw_change"])))) + # EXPAND PARAMETER PUTS LINEs TO EDGE
   coord_cartesian(clip = "off", xlim = c(as.Date(max(emp_region_fiveyear$date[emp_region_fiveyear$Region == "dfw_change"])) %m+% years(-5), as.Date(max(emp_region_fiveyear$date[emp_region_fiveyear$Region == "dfw_change"])))) +
   theme(
@@ -1184,6 +1184,7 @@ emp_division_fiveyear_graph <- ggplot(emp_division_fiveyear, ) +
   scale_x_date(date_breaks = "6 months", date_labels = "%b '%y", expand = c(0, 0), limits = c(as.Date(max(emp_division_fiveyear$date)) %m+% years(-5), as.Date(max(emp_division_fiveyear$date)))) +
   # scale_fill_manual(labels = c("Dallas MD", "Fort Worth MD"), values = c("dallas_md_change" = "#00A6E9", "fort_worth_md_change" = "#D03137")) +
   scale_fill_viridis(discrete = TRUE, option = "A", begin = 0.4, end = 0.8, labels = c("Dallas MD", "Fort Worth MD")) +
+  scale_y_continuous(limits = c(round_down_choose(min(emp_division_fiveyear$dfw_change), 100), round_up_choose(max(emp_division_fiveyear$dfw_change), 100)), breaks = seq(round_down_choose(min(emp_division_fiveyear$dfw_change), 100), round_up_choose(max(emp_division_fiveyear$dfw_change), 100), by = 100)) +
   theme(
     axis.text.x = element_text(angle = 45),
     plot.title = element_text(hjust = 0.5, size = 13),

@@ -1274,7 +1274,8 @@ unemp_area_fiveyear <- unemp_by_area %>%
   pivot_longer(cols = us:dfw, names_to = "Region", values_to = "Unemployment") %>%
   select(date, Region, Unemployment) %>%
   filter(!is.na(Unemployment)) %>%
-  filter(date >= as.Date("2019-08-01"))
+  filter(date >= as.Date("2019-08-01")) %>%
+  filter(date <= max(date[Region == "dfw"]))
 
 
 unemp_area_fiveyear_graph <- ggplot(unemp_area_fiveyear, aes(x = date, y = Unemployment, color = Region)) +
@@ -1483,9 +1484,9 @@ unemp_area_fiveyear_graph + inset_element(unemp_area_greatrecess_graph,
 
 cpi_oneyear_graph <- ggplot(cpi_rates_oneyear, aes(x = category, y = value, fill = region)) +
   geom_bar(position = "dodge", stat = "identity", color = "black") +
-  scale_fill_viridis(discrete = TRUE, labels = c("DFW", "Large Cities", "US", "West South Central")) +
+  scale_fill_viridis(discrete = TRUE, labels = c("DFW", "Large Cities", "US", "West South Central"), option = "A", begin = 0.4, end = 0.8) +
   scale_x_discrete(labels = c("All Items", "Core", "Energy", "Food")) +
-  scale_y_continuous(limits = c(-5, 5), breaks = seq(-10, 4, by = 2)) +
+  scale_y_continuous(limits = c(round_down_choose(min(cpi_rates_oneyear$value), 1), round_up_choose(max(cpi_rates_oneyear$value), 1)), breaks = seq(round_down_choose(min(cpi_rates_oneyear$value), 1), round_up_choose(max(cpi_rates_oneyear$value), 1), by = 1)) +
   theme(
     axis.text.x = element_text(size = 12),
     axis.text.y = element_text(size = 12),

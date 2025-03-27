@@ -251,11 +251,11 @@ UNEMPLOYMENT RATE
 :::
 
 ::: main_stat
-`r format(topline_BLS$unemp_rate[as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period)) & as.numeric(topline_BLS$year) == max(as.numeric(topline_BLS$year))], scientific = FALSE, big.mark = ",")`%
+`r format(topline_BLS$unemp_rate[topline_BLS$date == max(topline_BLS$date)], scientific = FALSE, big.mark = ",")`%
 
 [`r format(topline_BLS$date[topline_BLS$date == max(topline_BLS$date)], "%b. %Y")`]{.date_insert}
 
-[`r format(topline_BLS$unemp_rate[as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period)) & as.numeric(topline_BLS$year) == max(as.numeric(topline_BLS$year))] - topline_BLS$unemp_rate[as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period)) & as.numeric(topline_BLS$year) == max(as.numeric(topline_BLS$year))-1], scientific = FALSE, big.mark = ",")`]{.main_stat2}
+[`r format(topline_BLS$unemp_rate[topline_BLS$date == max(topline_BLS$date)] - topline_BLS$unemp_rate[topline_BLS$date == max(topline_BLS$date) %m-% years(1)], scientific = FALSE, big.mark = ",")`]{.main_stat2}
 :::
 
 ::: sub_stat
@@ -279,11 +279,11 @@ EMPLOYMENT CHANGE
 :::
 
 ::: main_stat
-`r format(((topline_BLS$emp_count[as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period)) & topline_BLS$year == max(topline_BLS$year)] - topline_BLS$emp_count[as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period)) & topline_BLS$year == max(topline_BLS$year)-1])/topline_BLS$emp_count[as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period)) & topline_BLS$year == max(topline_BLS$year)-1])*100, scientifc = FALSE, big.mark = ",", digits = 3)`%
+`r format(((topline_BLS$emp_count[topline_BLS$date == max(topline_BLS$date)] - topline_BLS$emp_count[topline_BLS$date == max(topline_BLS$date) %m-% years(1)])/topline_BLS$emp_count[topline_BLS$date == max(topline_BLS$date) %m-% years(1)])*100, scientifc = FALSE, big.mark = ",", digits = 3)`%
 
 [`r format(topline_BLS$date[topline_BLS$date == max(topline_BLS$date)], "%b. %Y")`]{.date_insert}
 
-[`r format(topline_BLS$emp_count[topline_BLS$year == max(topline_BLS$year) & as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period))] - topline_BLS$emp_count[topline_BLS$year == max(topline_BLS$year)-1 & as.numeric(topline_BLS$period) == max(as.numeric(topline_BLS$period))], scientific = FALSE, big.mark = ",", digits = 3)`]{.main_stat2}
+[`r format(topline_BLS$emp_count[topline_BLS$date == max(topline_BLS$date)] - topline_BLS$emp_count[topline_BLS$date == max(topline_BLS$date) %m-% years(1)], scientific = FALSE, big.mark = ",", digits = 3)`]{.main_stat2}
 :::
 
 ::: sub_stat
